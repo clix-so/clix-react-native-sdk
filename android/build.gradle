@@ -1,0 +1,81 @@
+buildscript {
+  repositories {
+    google()
+    mavenCentral()
+  }
+  dependencies {
+    classpath "com.android.tools.build:gradle:7.3.1"
+    classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.25"
+  }
+}
+
+def isNewArchitectureEnabled() {
+  return rootProject.hasProperty("newArchEnabled") && rootProject.getProperty("newArchEnabled") == "true"
+}
+
+apply plugin: "com.android.library"
+apply plugin: "kotlin-android"
+
+if (isNewArchitectureEnabled()) {
+  apply plugin: "com.facebook.react"
+}
+
+def getExtOrDefault(name) {
+  return rootProject.ext.has(name) ? rootProject.ext.get(name) : project.properties["Clix_" + name]
+}
+
+def getExtOrIntegerDefault(name) {
+  return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["Clix_" + name]).toInteger()
+}
+
+android {
+  compileSdkVersion getExtOrIntegerDefault("compileSdkVersion")
+  namespace "so.clix"
+  defaultConfig {
+    minSdkVersion getExtOrIntegerDefault("minSdkVersion")
+    targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
+    buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", isNewArchitectureEnabled().toString()
+  }
+
+  sourceSets {
+    main {
+      if (isNewArchitectureEnabled()) {
+        java.srcDirs += ["${project.buildDir}/generated/source/codegen/java"]
+        kotlin.srcDirs += ["src/newarch/kotlin"]
+      } else {
+        kotlin.srcDirs += ["src/oldarch/kotlin"]
+      }
+    }
+  }
+
+  buildTypes {
+    release {
+      minifyEnabled false
+    }
+  }
+
+  lintOptions {
+    disable "GradleCompatible"
+  }
+  compileOptions {
+    sourceCompatibility JavaVersion.VERSION_1_8
+    targetCompatibility JavaVersion.VERSION_1_8
+  }
+}
+
+repositories {
+  mavenCentral()
+  google()
+}
+
+dependencies {
+  implementation "com.facebook.react:react-native:0.20.1"
+  implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.25"
+}
+
+if (isNewArchitectureEnabled()) {
+  react {
+    libraryName = "Clix"
+    codegenJavaPackageName = "com.facebook.fbreact.specs"
+  }
+}
