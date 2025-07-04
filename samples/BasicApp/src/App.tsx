@@ -37,10 +37,16 @@ function App() {
   useEffect(() => {
     const initializeSDK = async () => {
       try {
+        // Use a fallback log level if ClixLogLevel.Debug is not available
+        const logLevel = ClixLogLevel?.Debug ?? 4; // 4 is Debug level
+
+        console.log('ClixLogLevel available:', !!ClixLogLevel);
+        console.log('ClixLogLevel.Debug value:', ClixLogLevel?.Debug);
+
         await Clix.initialize({
           projectId: ClixInfo.projectId,
           apiKey: ClixInfo.apiKey,
-          logLevel: ClixLogLevel.Debug,
+          logLevel: logLevel,
         });
 
         // Get device information after initialization
@@ -51,7 +57,7 @@ function App() {
         setPushToken(currentPushToken);
       } catch (error) {
         console.error('Failed to initialize Clix SDK:', error);
-        Alert.alert('Error', 'Failed to initialize Clix SDK');
+        Alert.alert('Error', `Failed to initialize Clix SDK: ${error}`);
       }
     };
 

@@ -1,6 +1,6 @@
 import { Clix } from './core/Clix';
 import { ClixLogLevel } from './utils/logging/ClixLogger';
 
-export { ClixLogLevel };
-
+// Export everything
+export { Clix, ClixLogLevel };
 export default Clix;
