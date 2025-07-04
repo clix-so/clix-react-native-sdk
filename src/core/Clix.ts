@@ -113,7 +113,11 @@ export class Clix {
       this._eventService,
       this._storageService,
       this._deviceService,
-      tokenService
+      tokenService,
+      {
+        onPushReceived: configWithDefaults.onPushReceived,
+        onPushTapped: configWithDefaults.onPushTapped,
+      }
     );
   }
 
@@ -267,5 +271,16 @@ export class Clix {
     } catch (error) {
       throw ClixError.unknownErrorWithReason(`Failed to track event: ${error}`);
     }
+  }
+
+  /**
+   * Get notification service
+   */
+  static getNotificationService(): NotificationService | null {
+    if (!this._shared) {
+      ClixLogger.warn('Clix SDK not initialized');
+      return null;
+    }
+    return this._shared._notificationService;
   }
 }

@@ -10,13 +10,12 @@ require Pod::Executable.execute_command('node', ['-p',
 platform :ios, min_ios_version_supported
 prepare_react_native_project!
 
-linkage = ENV['USE_FRAMEWORKS']
-if linkage != nil
-  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  use_frameworks! :linkage => linkage.to_sym
-end
+# Enable modular headers for Swift pods
+use_modular_headers!
 
 target 'ClixSample' do
+  $RNFirebaseAsStaticFramework = true
+  use_frameworks! :linkage => :static
   config = use_native_modules!
 
   use_react_native!(
@@ -33,5 +32,12 @@ target 'ClixSample' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+    
+    # Fix deployment target warnings
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+      end
+    end
   end
 end

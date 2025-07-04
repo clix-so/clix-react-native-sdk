@@ -78,3 +78,7 @@ nitrogen/
 
 # Agents
 .claude
+
+# Firebase Configuration Files
+GoogleService-Info.plist
+google-services.json

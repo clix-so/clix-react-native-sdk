@@ -21,6 +21,7 @@ import {
 import Clix, { ClixLogLevel } from '@clix/react-native-sdk';
 import { ClixInfo } from './ClixInfo';
 import { useState, useEffect } from 'react';
+import messaging from '@react-native-firebase/messaging';
 
 function App() {
   // Theme configuration
@@ -30,6 +31,9 @@ function App() {
   const [propertyValue, setPropertyValue] = useState('');
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [pushToken, setPushToken] = useState<string | null>(null);
+  const [notificationPermission, setNotificationPermission] =
+    useState<string>('not-determined');
+  const [lastNotification, setLastNotification] = useState<any>(null);
 
   const projectId = ClixInfo.projectId;
   const apiKey = ClixInfo.apiKey;
@@ -43,18 +47,41 @@ function App() {
         console.log('ClixLogLevel available:', !!ClixLogLevel);
         console.log('ClixLogLevel.Debug value:', ClixLogLevel?.Debug);
 
+        // Initialize Clix SDK with push notification handlers
         await Clix.initialize({
           projectId: ClixInfo.projectId,
           apiKey: ClixInfo.apiKey,
           logLevel: logLevel,
+          onPushReceived: (data) => {
+            console.log('Push notification received:', data);
+            setLastNotification({
+              type: 'received',
+              data: data,
+              timestamp: new Date().toISOString(),
+            });
+          },
+          onPushTapped: (data) => {
+            console.log('Push notification tapped:', data);
+            setLastNotification({
+              type: 'tapped',
+              data: data,
+              timestamp: new Date().toISOString(),
+            });
+          },
         });
 
         // Get device information after initialization
         const currentDeviceId = await Clix.getDeviceId();
         const currentPushToken = await Clix.getPushToken();
 
+        // Get notification service for permission status
+        const notificationService = Clix.getNotificationService();
+        const permissionStatus =
+          await notificationService?.requestNotificationPermission();
+
         setDeviceId(currentDeviceId);
         setPushToken(currentPushToken);
+        setNotificationPermission(permissionStatus?.status || 'not-determined');
       } catch (error) {
         console.error('Failed to initialize Clix SDK:', error);
         Alert.alert('Error', `Failed to initialize Clix SDK: ${error}`);
@@ -62,6 +89,21 @@ function App() {
     };
 
     initializeSDK();
+
+    // Set up Firebase messaging listeners
+    const unsubscribeOnMessage = messaging().onMessage(
+      async (remoteMessage) => {
+        console.log('FCM Message received in foreground:', remoteMessage);
+        Alert.alert(
+          'New Notification',
+          remoteMessage.notification?.body || 'You have a new message'
+        );
+      }
+    );
+
+    return () => {
+      unsubscribeOnMessage();
+    };
   }, []);
 
   const handleSubmitUserId = async () => {
@@ -94,6 +136,66 @@ function App() {
     } catch (error) {
       console.error('Failed to set property:', error);
       Alert.alert('Error', 'Failed to set property');
+    }
+  };
+
+  const handleRequestPermission = async () => {
+    try {
+      const notificationService = Clix.getNotificationService();
+      if (!notificationService) {
+        Alert.alert('Error', 'Notification service not available');
+        return;
+      }
+
+      const status = await notificationService.requestNotificationPermission();
+      setNotificationPermission(status?.status || 'denied');
+
+      if (status?.granted) {
+        Alert.alert('Success', 'Notification permission granted');
+        // Update push token after permission granted
+        const token = await Clix.getPushToken();
+        setPushToken(token);
+      } else {
+        Alert.alert(
+          'Permission Denied',
+          'Please enable notifications in settings'
+        );
+      }
+    } catch (error) {
+      console.error('Failed to request permission:', error);
+      Alert.alert('Error', 'Failed to request notification permission');
+    }
+  };
+
+  const handleSubscribeToTopic = async () => {
+    try {
+      const notificationService = Clix.getNotificationService();
+      if (!notificationService) {
+        Alert.alert('Error', 'Notification service not available');
+        return;
+      }
+
+      await notificationService.subscribeToTopic('test-topic');
+      Alert.alert('Success', 'Subscribed to test-topic');
+    } catch (error) {
+      console.error('Failed to subscribe to topic:', error);
+      Alert.alert('Error', 'Failed to subscribe to topic');
+    }
+  };
+
+  const handleUnsubscribeFromTopic = async () => {
+    try {
+      const notificationService = Clix.getNotificationService();
+      if (!notificationService) {
+        Alert.alert('Error', 'Notification service not available');
+        return;
+      }
+
+      await notificationService.unsubscribeFromTopic('test-topic');
+      Alert.alert('Success', 'Unsubscribed from test-topic');
+    } catch (error) {
+      console.error('Failed to unsubscribe from topic:', error);
+      Alert.alert('Error', 'Failed to unsubscribe from topic');
     }
   };
 
@@ -132,8 +234,24 @@ function App() {
 
           <View style={styles.infoContainer}>
             <Text style={styles.label}>Push Token:</Text>
-            <Text style={styles.infoText}>{pushToken}</Text>
+            <Text style={styles.infoText}>{pushToken || 'Not available'}</Text>
           </View>
+
+          <View style={styles.infoContainer}>
+            <Text style={styles.label}>Notification Permission:</Text>
+            <Text style={styles.infoText}>{notificationPermission}</Text>
+          </View>
+
+          {lastNotification && (
+            <View style={styles.infoContainer}>
+              <Text style={styles.label}>Last Notification:</Text>
+              <Text style={styles.infoText}>
+                Type: {lastNotification.type}
+                {`\n`}Time: {lastNotification.timestamp}
+                {`\n`}Data: {JSON.stringify(lastNotification.data, null, 2)}
+              </Text>
+            </View>
+          )}
 
           {/* User ID Section */}
           <View style={styles.inputSection}>
@@ -184,6 +302,36 @@ function App() {
           >
             <Text style={styles.buttonText}>Set User Property</Text>
           </TouchableOpacity>
+
+          {/* Notification Actions */}
+          <View style={styles.notificationSection}>
+            <Text style={[styles.label, styles.sectionTitle]}>
+              Push Notifications
+            </Text>
+
+            {notificationPermission !== 'authorized' && (
+              <TouchableOpacity
+                style={styles.actionButton}
+                onPress={handleRequestPermission}
+              >
+                <Text style={styles.buttonText}>Request Permission</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleSubscribeToTopic}
+            >
+              <Text style={styles.buttonText}>Subscribe to Test Topic</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={handleUnsubscribeFromTopic}
+            >
+              <Text style={styles.buttonText}>Unsubscribe from Test Topic</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -265,6 +413,23 @@ const styles = StyleSheet.create({
     color: '#000',
     fontSize: 16,
     fontWeight: '600',
+  },
+  notificationSection: {
+    marginTop: 30,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    marginBottom: 20,
+  },
+  actionButton: {
+    backgroundColor: '#666',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 10,
   },
 });
 
