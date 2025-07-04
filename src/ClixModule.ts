@@ -13,7 +13,7 @@ const ClixModule = isTurboModuleEnabled
   ? require('./NativeClix').default
   : NativeModules.Clix;
 
-const Clix = ClixModule
+const Module = ClixModule
   ? ClixModule
   : new Proxy(
       {},
@@ -24,4 +24,4 @@ const Clix = ClixModule
       }
     );
 
-export default Clix;
+export default Module;
