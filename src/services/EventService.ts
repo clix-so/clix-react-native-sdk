@@ -18,7 +18,6 @@ export class EventService {
 
       const deviceId = await this.deviceService.getCurrentDeviceId();
 
-      // Clean properties - remove null/undefined values
       const cleanProperties: Record<string, any> = {};
       if (properties) {
         Object.entries(properties).forEach(([key, value]) => {

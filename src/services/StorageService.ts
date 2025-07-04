@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ClixLogger } from '../utils/logging/ClixLogger';
 
 export class StorageService {
-  private static instance: StorageService | null = null;
+  private static instance?: StorageService;
   private memoryStorage: Map<string, string> = new Map();
   private isAsyncStorageAvailable: boolean = true;
 
@@ -33,9 +33,9 @@ export class StorageService {
     }
   }
 
-  async set<T>(key: string, value: T | null): Promise<void> {
+  async set<T>(key: string, value: T): Promise<void> {
     try {
-      if (value === null || value === undefined) {
+      if (value === undefined) {
         if (this.isAsyncStorageAvailable) {
           await AsyncStorage.removeItem(key);
         } else {
@@ -57,8 +57,8 @@ export class StorageService {
       if (this.isAsyncStorageAvailable) {
         ClixLogger.warn('AsyncStorage failed, falling back to memory storage');
         this.isAsyncStorageAvailable = false;
-        const encoded = value ? JSON.stringify(value) : null;
-        if (encoded) {
+        if (value !== undefined) {
+          const encoded = JSON.stringify(value);
           this.memoryStorage.set(key, encoded);
         } else {
           this.memoryStorage.delete(key);
@@ -69,17 +69,17 @@ export class StorageService {
     }
   }
 
-  async get<T>(key: string): Promise<T | null> {
+  async get<T>(key: string): Promise<T | undefined> {
     try {
-      let data: string | null = null;
+      let data: string | null | undefined;
 
       if (this.isAsyncStorageAvailable) {
         data = await AsyncStorage.getItem(key);
       } else {
-        data = this.memoryStorage.get(key) || null;
+        data = this.memoryStorage.get(key);
       }
 
-      if (data === null) return null;
+      if (data === null || data === undefined) return undefined;
 
       try {
         const decoded = JSON.parse(data);
@@ -98,7 +98,7 @@ export class StorageService {
       if (this.isAsyncStorageAvailable) {
         ClixLogger.warn('AsyncStorage failed, falling back to memory storage');
         this.isAsyncStorageAvailable = false;
-        const data = this.memoryStorage.get(key) || null;
+        const data = this.memoryStorage.get(key);
         if (data) {
           try {
             return JSON.parse(data) as T;
@@ -107,7 +107,7 @@ export class StorageService {
           }
         }
       }
-      return null;
+      return undefined;
     }
   }
 

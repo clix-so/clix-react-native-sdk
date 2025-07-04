@@ -6,6 +6,4 @@ export interface ClixConfig {
   endpoint?: string;
   logLevel?: ClixLogLevel;
   extraHeaders?: Record<string, string>;
-  onPushReceived?: (data: any) => void;
-  onPushTapped?: (data: any) => void;
 }

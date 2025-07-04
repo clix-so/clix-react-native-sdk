@@ -11,15 +11,14 @@ import { ClixLogLevel, ClixLogger } from '../utils/logging/ClixLogger';
 import type { ClixConfig } from './ClixConfig';
 
 export class Clix {
-  private static _shared: Clix | null = null;
-  private static _isInitializing: boolean = false;
-  private static _initPromise: Promise<void> | null = null;
+  private static shared?: Clix;
+  private static isInitializing: boolean = false;
+  private static initPromise?: Promise<void>;
 
-  // Services - nullable until initialization
-  private _storageService: StorageService | null = null;
-  private _eventService: EventService | null = null;
-  private _deviceService: DeviceService | null = null;
-  private _notificationService: NotificationService | null = null;
+  private storageService?: StorageService;
+  private eventService?: EventService;
+  private deviceService?: DeviceService;
+  private notificationService?: NotificationService;
 
   private constructor() {}
 
@@ -27,32 +26,32 @@ export class Clix {
    * Initialize Clix SDK
    */
   static async initialize(config: ClixConfig): Promise<void> {
-    if (this._isInitializing && this._initPromise) {
-      await this._initPromise;
+    if (this.isInitializing && this.initPromise) {
+      await this.initPromise;
       return;
     }
 
-    this._isInitializing = true;
-    this._initPromise = this._performInitialization(config);
+    this.isInitializing = true;
+    this.initPromise = this.performInitialization(config);
 
     try {
-      await this._initPromise;
+      await this.initPromise;
     } finally {
-      this._isInitializing = false;
+      this.isInitializing = false;
     }
   }
 
-  private static async _performInitialization(
+  private static async performInitialization(
     config: ClixConfig
   ): Promise<void> {
     try {
-      ClixLogger.setLogLevel(config.logLevel || ClixLogLevel.Error);
+      ClixLogger.setLogLevel(config.logLevel || ClixLogLevel.ERROR);
       ClixLogger.info('Initializing Clix SDK');
 
       const instance = new Clix();
-      await instance._setConfig(config);
+      await instance.setConfig(config);
 
-      this._shared = instance;
+      this.shared = instance;
       ClixLogger.info('Clix SDK initialized successfully');
     } catch (error) {
       ClixLogger.error('Failed to initialize Clix SDK', error);
@@ -63,16 +62,16 @@ export class Clix {
   /**
    * Set configuration
    */
-  private async _setConfig(config: ClixConfig): Promise<void> {
+  private async setConfig(config: ClixConfig): Promise<void> {
     // Initialize storage service
-    this._storageService = new StorageService();
+    this.storageService = new StorageService();
 
     // Store configuration
-    await this._storageService.set('project_id', config.projectId);
-    await this._storageService.set('api_key', config.apiKey);
+    await this.storageService.set('project_id', config.projectId);
+    await this.storageService.set('api_key', config.apiKey);
 
     // Store full config for background handler
-    await this._storageService.set('clix_config', {
+    await this.storageService.set('clix_config', {
       projectId: config.projectId,
       apiKey: config.apiKey,
       endpoint: config.endpoint,
@@ -84,7 +83,7 @@ export class Clix {
     const configWithDefaults: ClixConfig = {
       ...config,
       endpoint: config.endpoint || 'https://api.clix.so',
-      logLevel: config.logLevel || ClixLogLevel.Error,
+      logLevel: config.logLevel || ClixLogLevel.ERROR,
     };
 
     // Initialize API client
@@ -95,51 +94,70 @@ export class Clix {
     const eventAPIService = new EventAPIService(apiClient);
 
     // Initialize token service
-    const tokenService = new TokenService(this._storageService);
+    const tokenService = new TokenService(this.storageService);
 
     // Initialize device service
-    this._deviceService = new DeviceService(
-      this._storageService,
+    this.deviceService = new DeviceService(
+      this.storageService,
       tokenService,
       deviceAPIService
     );
 
     // Initialize event service
-    this._eventService = new EventService(eventAPIService, this._deviceService);
+    this.eventService = new EventService(eventAPIService, this.deviceService);
 
     // Initialize notification service
-    this._notificationService = new NotificationService();
-    await this._notificationService.initialize(
-      this._eventService,
-      this._storageService,
-      this._deviceService,
-      tokenService,
-      {
-        onPushReceived: configWithDefaults.onPushReceived,
-        onPushTapped: configWithDefaults.onPushTapped,
-      }
+    this.notificationService = new NotificationService();
+    await this.notificationService.initialize(
+      this.eventService,
+      this.storageService,
+      this.deviceService,
+      tokenService
     );
   }
 
   /**
    * Wait for initialization with timeout protection
    */
-  private static async _waitForInitialization(): Promise<void> {
-    if (this._shared !== null) return;
-    if (this._isInitializing && this._initPromise) {
-      await this._initPromise;
+  private static async waitForInitialization(): Promise<void> {
+    if (this.shared) return;
+
+    // If initialization is in progress, wait for it
+    if (this.isInitializing && this.initPromise) {
+      await this.initPromise;
       return;
     }
-    throw ClixError.notInitialized();
+
+    // If initialization hasn't started yet, wait for it to start
+    // Use a polling mechanism to avoid freezing the app
+    const maxWaitTime = 30000; // 30 seconds timeout
+    const pollInterval = 100; // Check every 100ms
+    const startTime = Date.now();
+
+    while (!this.shared && !this.isInitializing) {
+      if (Date.now() - startTime > maxWaitTime) {
+        throw ClixError.unknownErrorWithReason(
+          'Initialization timeout: Clix.initialize() was not called within 30 seconds'
+        );
+      }
+
+      // Wait for a short interval before checking again
+      await new Promise((resolve) => setTimeout(resolve, pollInterval));
+    }
+
+    // If initialization started while we were waiting, wait for it to complete
+    if (this.isInitializing && this.initPromise) {
+      await this.initPromise;
+    }
   }
 
   /**
    * Set user ID
    */
   static async setUserId(userId: string): Promise<void> {
-    await this._waitForInitialization();
+    await this.waitForInitialization();
     try {
-      await this._shared!._deviceService!.setProjectUserId(userId);
+      await this.shared!.deviceService!.setProjectUserId(userId);
     } catch (error) {
       throw ClixError.unknownErrorWithReason(`Failed to set user ID: ${error}`);
     }
@@ -149,9 +167,9 @@ export class Clix {
    * Remove user ID
    */
   static async removeUserId(): Promise<void> {
-    await this._waitForInitialization();
+    await this.waitForInitialization();
     try {
-      await this._shared!._deviceService!.removeProjectUserId();
+      await this.shared!.deviceService!.removeProjectUserId();
     } catch (error) {
       throw ClixError.unknownErrorWithReason(
         `Failed to remove user ID: ${error}`
@@ -163,9 +181,9 @@ export class Clix {
    * Set user property
    */
   static async setUserProperty(key: string, value: any): Promise<void> {
-    await this._waitForInitialization();
+    await this.waitForInitialization();
     try {
-      await this._shared!._deviceService!.updateUserProperties({
+      await this.shared!.deviceService!.updateUserProperties({
         [key]: value,
       });
     } catch (error) {
@@ -181,9 +199,9 @@ export class Clix {
   static async setUserProperties(
     userProperties: Record<string, any>
   ): Promise<void> {
-    await this._waitForInitialization();
+    await this.waitForInitialization();
     try {
-      await this._shared!._deviceService!.updateUserProperties(userProperties);
+      await this.shared!.deviceService!.updateUserProperties(userProperties);
     } catch (error) {
       throw ClixError.unknownErrorWithReason(
         `Failed to set user properties: ${error}`
@@ -195,9 +213,9 @@ export class Clix {
    * Remove user property
    */
   static async removeUserProperty(key: string): Promise<void> {
-    await this._waitForInitialization();
+    await this.waitForInitialization();
     try {
-      await this._shared!._deviceService!.removeUserProperties([key]);
+      await this.shared!.deviceService!.removeUserProperties([key]);
     } catch (error) {
       throw ClixError.unknownErrorWithReason(
         `Failed to remove user property: ${error}`
@@ -209,9 +227,9 @@ export class Clix {
    * Remove user properties
    */
   static async removeUserProperties(keys: string[]): Promise<void> {
-    await this._waitForInitialization();
+    await this.waitForInitialization();
     try {
-      await this._shared!._deviceService!.removeUserProperties(keys);
+      await this.shared!.deviceService!.removeUserProperties(keys);
     } catch (error) {
       throw ClixError.unknownErrorWithReason(
         `Failed to remove user properties: ${error}`
@@ -222,19 +240,19 @@ export class Clix {
   /**
    * Get device ID
    */
-  static async getDeviceId(): Promise<string | null> {
-    await this._waitForInitialization();
-    const deviceId = await this._shared!._deviceService!.getCurrentDeviceId();
+  static async getDeviceId(): Promise<string | undefined> {
+    await this.waitForInitialization();
+    const deviceId = await this.shared!.deviceService!.getCurrentDeviceId();
     return deviceId;
   }
 
   /**
    * Get push token
    */
-  static async getPushToken(): Promise<string | null> {
-    await this._waitForInitialization();
-    const token = await this._shared!._notificationService!.getCurrentToken();
-    return token || null;
+  static async getPushToken(): Promise<string | undefined> {
+    await this.waitForInitialization();
+    const token = await this.shared!.notificationService!.getCurrentToken();
+    return token || undefined;
   }
 
   /**
@@ -248,7 +266,7 @@ export class Clix {
    * Check if SDK is initialized
    */
   static get isInitialized(): boolean {
-    return this._shared !== null;
+    return !!this.shared;
   }
 
   /**
@@ -261,9 +279,9 @@ export class Clix {
       messageId?: string;
     }
   ): Promise<void> {
-    await this._waitForInitialization();
+    await this.waitForInitialization();
     try {
-      await this._shared!._eventService!.trackEvent(
+      await this.shared!.eventService!.trackEvent(
         name,
         options?.properties,
         options?.messageId
@@ -276,11 +294,11 @@ export class Clix {
   /**
    * Get notification service
    */
-  static getNotificationService(): NotificationService | null {
-    if (!this._shared) {
+  static getNotificationService(): NotificationService | undefined {
+    if (!this.shared) {
       ClixLogger.warn('Clix SDK not initialized');
-      return null;
+      return undefined;
     }
-    return this._shared._notificationService;
+    return this.shared.notificationService;
   }
 }

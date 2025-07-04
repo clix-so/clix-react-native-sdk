@@ -42,10 +42,10 @@ function App() {
     const initializeSDK = async () => {
       try {
         // Use a fallback log level if ClixLogLevel.Debug is not available
-        const logLevel = ClixLogLevel?.Debug ?? 4; // 4 is Debug level
+        const logLevel = ClixLogLevel?.DEBUG ?? 4; // 4 is Debug level
 
         console.log('ClixLogLevel available:', !!ClixLogLevel);
-        console.log('ClixLogLevel.Debug value:', ClixLogLevel?.Debug);
+        console.log('ClixLogLevel.Debug value:', ClixLogLevel?.DEBUG);
 
         // Initialize Clix SDK with push notification handlers
         await Clix.initialize({

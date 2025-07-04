@@ -25,7 +25,7 @@ export type PushReceivedHandler = (data: PushNotificationData) => void;
 export type PushTappedHandler = (data: PushNotificationData) => void;
 
 export class NotificationService {
-  private static instance: NotificationService | null = null;
+  private static instance?: NotificationService;
 
   private eventService?: EventService;
   private storageService?: StorageService;
@@ -165,7 +165,9 @@ export class NotificationService {
     }
   }
 
-  parseClixPayload(userInfo: PushNotificationData): Record<string, any> | null {
+  parseClixPayload(
+    userInfo: PushNotificationData
+  ): Record<string, any> | undefined {
     try {
       if (userInfo.clix) {
         const clixData = userInfo.clix;
@@ -189,10 +191,10 @@ export class NotificationService {
         return userInfo;
       }
 
-      return null;
+      return undefined;
     } catch (error) {
       ClixLogger.error('Failed to parse Clix payload', error);
-      return null;
+      return undefined;
     }
   }
 

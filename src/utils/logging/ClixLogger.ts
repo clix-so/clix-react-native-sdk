@@ -1,64 +1,61 @@
 export enum ClixLogLevel {
-  None = 0,
-  Error = 1,
-  Warn = 2,
-  Info = 3,
-  Debug = 4,
+  NONE = 0,
+  ERROR = 1,
+  WARN = 2,
+  INFO = 3,
+  DEBUG = 4,
 }
 
 export class ClixLogger {
-  private static _logLevel: ClixLogLevel = ClixLogLevel.Info;
+  private static logLevel: ClixLogLevel = ClixLogLevel.INFO;
 
   static setLogLevel(level: ClixLogLevel): void {
-    this._logLevel = level;
+    this.logLevel = level;
   }
 
   static shouldLog(level: ClixLogLevel): boolean {
-    return this._logLevel >= level;
+    return this.logLevel >= level;
   }
 
   static log(level: ClixLogLevel, message: string, error?: any): void {
-    if (level > this._logLevel) {
+    if (level > this.logLevel) {
       return;
     }
 
     const timestamp = new Date().toISOString();
     let logMessage = `[Clix][${timestamp}] ${message}`;
-    if (error != null) {
-      logMessage += ` - Error: ${error}`;
-    }
 
     switch (level) {
-      case ClixLogLevel.Debug:
-        console.debug(`[DEBUG]${logMessage}`);
+      case ClixLogLevel.DEBUG:
+        console.debug(logMessage, error);
         break;
-      case ClixLogLevel.Info:
-        console.info(`[INFO]${logMessage}`);
+      case ClixLogLevel.INFO:
+        console.info(logMessage, error);
         break;
-      case ClixLogLevel.Warn:
-        console.warn(`[WARN]${logMessage}`);
+      case ClixLogLevel.WARN:
+        console.warn(logMessage, error);
         break;
-      case ClixLogLevel.Error:
-        console.error(`[ERROR]${logMessage}`, error);
+      case ClixLogLevel.ERROR:
+        console.error(logMessage, error);
         break;
-      case ClixLogLevel.None:
+      case ClixLogLevel.NONE:
         return;
     }
   }
 
   static error(message: string, error?: any): void {
-    this.log(ClixLogLevel.Error, message, error);
+    this.log(ClixLogLevel.ERROR, message, error);
   }
 
   static warn(message: string, error?: any): void {
-    this.log(ClixLogLevel.Warn, message, error);
+    this.log(ClixLogLevel.WARN, message, error);
   }
 
   static info(message: string, error?: any): void {
-    this.log(ClixLogLevel.Info, message, error);
+    this.log(ClixLogLevel.INFO, message, error);
   }
 
   static debug(message: string, error?: any): void {
-    this.log(ClixLogLevel.Debug, message, error);
+    this.log(ClixLogLevel.DEBUG, message, error);
   }
 }

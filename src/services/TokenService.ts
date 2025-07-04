@@ -8,14 +8,14 @@ export class TokenService {
 
   constructor(private readonly storageService: StorageService) {}
 
-  async getCurrentToken(): Promise<string | null> {
+  async getCurrentToken(): Promise<string | undefined> {
     try {
       return await this.storageService.get<string>(
         TokenService.CURRENT_TOKEN_KEY
       );
     } catch (error) {
       ClixLogger.error('Failed to get current token', error);
-      return null;
+      return undefined;
     }
   }
 
@@ -24,7 +24,7 @@ export class TokenService {
       const result = await this.storageService.get<string[]>(
         TokenService.PREVIOUS_TOKENS_KEY
       );
-      if (result === null) return [];
+      if (result === undefined) return [];
 
       return Array.isArray(result) ? result : [];
     } catch (error) {

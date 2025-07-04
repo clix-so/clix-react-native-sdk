@@ -40,7 +40,7 @@ class ClixDemo extends React.Component<Props, State> {
       await Clix.initialize({
         projectId: ClixInfo.projectId,
         apiKey: ClixInfo.apiKey,
-        logLevel: ClixLogLevel.Debug,
+        logLevel: ClixLogLevel.DEBUG,
       });
       this.clixLog('Clix SDK initialized successfully');
 
