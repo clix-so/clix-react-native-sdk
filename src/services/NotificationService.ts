@@ -1,8 +1,12 @@
-import { Platform, Linking } from 'react-native';
+import messaging, {
+  FirebaseMessagingTypes,
+} from '@react-native-firebase/messaging';
+import { Linking, Platform } from 'react-native';
+import type { ClixConfig } from '../core/ClixConfig';
 import { ClixLogger } from '../utils/logging/ClixLogger';
+import { DeviceService } from './DeviceService';
 import { EventService } from './EventService';
 import { StorageService } from './StorageService';
-import { DeviceService } from './DeviceService';
 import { TokenService } from './TokenService';
 
 // Types for push notification data
@@ -21,9 +25,6 @@ export interface NotificationPermissionStatus {
   granted: boolean;
 }
 
-export type PushReceivedHandler = (data: PushNotificationData) => void;
-export type PushTappedHandler = (data: PushNotificationData) => void;
-
 export class NotificationService {
   private static instance?: NotificationService;
 
@@ -35,8 +36,10 @@ export class NotificationService {
   private isInitialized = false;
   private currentToken?: string;
 
-  private onPushReceived?: PushReceivedHandler;
-  private onPushTapped?: PushTappedHandler;
+  // Firebase messaging unsubscribe functions
+  private unsubscribeOnMessage?: () => void;
+  private unsubscribeOnNotificationOpenedApp?: () => void;
+  private unsubscribeOnTokenRefresh?: () => void;
 
   constructor() {
     if (NotificationService.instance) {
@@ -49,11 +52,7 @@ export class NotificationService {
     eventService: EventService,
     storageService: StorageService,
     deviceService: DeviceService,
-    tokenService: TokenService,
-    options?: {
-      onPushReceived?: PushReceivedHandler;
-      onPushTapped?: PushTappedHandler;
-    }
+    tokenService: TokenService
   ): Promise<void> {
     if (this.isInitialized) return;
 
@@ -61,8 +60,6 @@ export class NotificationService {
     this.storageService = storageService;
     this.deviceService = deviceService;
     this.tokenService = tokenService;
-    this.onPushReceived = options?.onPushReceived;
-    this.onPushTapped = options?.onPushTapped;
 
     try {
       ClixLogger.info('Initializing notification service');
@@ -89,6 +86,9 @@ export class NotificationService {
         ClixLogger.info('Skipping token setup due to denied permissions');
       }
 
+      // Handle initial message (app opened from notification)
+      await this.handleInitialMessage();
+
       this.isInitialized = true;
       ClixLogger.info('Notification service initialized successfully');
     } catch (error) {
@@ -98,20 +98,137 @@ export class NotificationService {
   }
 
   private async initializePlatformNotifications(): Promise<void> {
-    // In React Native, we rely on native modules or libraries like @react-native-firebase/messaging
-    // For now, we'll implement a minimal version that can be extended
-    ClixLogger.debug('Platform notification initialization completed');
+    try {
+      // Register background message handler
+      messaging().setBackgroundMessageHandler(this.handleBackgroundMessage);
+
+      ClixLogger.debug('Platform notification initialization completed');
+    } catch (error) {
+      ClixLogger.error('Failed to initialize platform notifications', error);
+      throw error;
+    }
   }
 
   private setupMessageHandlers(): void {
-    // This would typically integrate with @react-native-firebase/messaging or similar
-    // For now, we'll set up basic handlers that can be called from native side
-    ClixLogger.debug('Message handlers setup completed');
+    try {
+      // Handle foreground messages
+      this.unsubscribeOnMessage = messaging().onMessage(
+        this.handleForegroundMessage
+      );
+
+      // Handle notification opened app
+      this.unsubscribeOnNotificationOpenedApp =
+        messaging().onNotificationOpenedApp(this.handleNotificationOpenedApp);
+
+      ClixLogger.debug('Message handlers setup completed');
+    } catch (error) {
+      ClixLogger.error('Failed to setup message handlers', error);
+    }
   }
 
   private setupTokenRefreshListener(): void {
-    // This would listen to token refresh events from the native side
-    ClixLogger.debug('Token refresh listener setup completed');
+    try {
+      this.unsubscribeOnTokenRefresh = messaging().onTokenRefresh(
+        this.handleTokenRefresh
+      );
+      ClixLogger.debug('Token refresh listener setup completed');
+    } catch (error) {
+      ClixLogger.error('Failed to setup token refresh listener', error);
+    }
+  }
+
+  private handleForegroundMessage = async (
+    remoteMessage: FirebaseMessagingTypes.RemoteMessage
+  ): Promise<void> => {
+    try {
+      ClixLogger.info(
+        `Received foreground message: ${remoteMessage.messageId}`
+      );
+      ClixLogger.debug(`Message data: ${JSON.stringify(remoteMessage.data)}`);
+      ClixLogger.debug(
+        `Message notification: title="${remoteMessage.notification?.title}", body="${remoteMessage.notification?.body}"`
+      );
+
+      const clixPayload = this.parseClixPayload(remoteMessage.data || {});
+      if (clixPayload) {
+        ClixLogger.debug(`Parsed Clix payload: ${JSON.stringify(clixPayload)}`);
+        await this.trackPushNotificationReceived(clixPayload);
+      }
+    } catch (error) {
+      ClixLogger.error('Failed to handle foreground message', error);
+    }
+  };
+
+  private handleNotificationOpenedApp = async (
+    remoteMessage: FirebaseMessagingTypes.RemoteMessage
+  ): Promise<void> => {
+    try {
+      ClixLogger.info(
+        `App opened from notification: ${remoteMessage.messageId}`
+      );
+      await this.handleNotificationTap(remoteMessage.data || {});
+    } catch (error) {
+      ClixLogger.error('Failed to handle notification opened app', error);
+    }
+  };
+
+  private handleTokenRefresh = async (token: string): Promise<void> => {
+    try {
+      ClixLogger.info('FCM token refreshed');
+      this.currentToken = token;
+      await this.saveAndRegisterToken(token);
+    } catch (error) {
+      ClixLogger.error('Failed to handle token refresh', error);
+    }
+  };
+
+  private handleBackgroundMessage = async (
+    remoteMessage: FirebaseMessagingTypes.RemoteMessage
+  ): Promise<void> => {
+    try {
+      ClixLogger.info(
+        `Background message received: ${remoteMessage.messageId}`
+      );
+      ClixLogger.debug(
+        `Background message data: ${JSON.stringify(remoteMessage.data)}`
+      );
+
+      const clixPayload = this.parseClixPayload(remoteMessage.data || {});
+      if (clixPayload) {
+        await this.trackPushNotificationReceivedInBackground(clixPayload);
+
+        // Store background notification data
+        await this.storeBackgroundNotificationData(remoteMessage, clixPayload);
+      }
+    } catch (error) {
+      ClixLogger.error('Failed to handle background message', error);
+    }
+  };
+
+  private async handleInitialMessage(): Promise<void> {
+    try {
+      // Note: getInitialMessage is available in newer versions of @react-native-firebase/messaging
+      // For compatibility, we'll handle this through the app opening handlers instead
+      ClixLogger.debug('Initial message handling setup completed');
+    } catch (error) {
+      ClixLogger.error('Failed to handle initial message', error);
+    }
+  }
+
+  private async handleNotificationTap(
+    data: PushNotificationData
+  ): Promise<void> {
+    try {
+      const clixPayload = this.parseClixPayload(data);
+      if (clixPayload) {
+        await this.trackPushEvent('PUSH_NOTIFICATION_TAPPED', clixPayload);
+      }
+
+      // Handle URL navigation
+      await this.handleUrlNavigation(data);
+    } catch (error) {
+      ClixLogger.error('Failed to handle notification tap', error);
+    }
   }
 
   async getCurrentToken(): Promise<string | undefined> {
@@ -132,36 +249,6 @@ export class NotificationService {
       }
     } catch (error) {
       ClixLogger.error('Failed to update token', error);
-    }
-  }
-
-  async handlePushReceived(userInfo: PushNotificationData): Promise<void> {
-    try {
-      const clixPayload = this.parseClixPayload(userInfo);
-      if (clixPayload) {
-        ClixLogger.debug(`Parsed Clix payload: ${JSON.stringify(clixPayload)}`);
-        await this.trackPushNotificationReceived(clixPayload);
-      }
-
-      this.onPushReceived?.(userInfo);
-    } catch (error) {
-      ClixLogger.error('Failed to handle push received', error);
-    }
-  }
-
-  async handlePushTapped(userInfo: PushNotificationData): Promise<void> {
-    try {
-      const clixPayload = this.parseClixPayload(userInfo);
-      if (clixPayload) {
-        await this.trackPushEvent('PUSH_NOTIFICATION_TAPPED', clixPayload);
-      }
-
-      // Handle URL navigation
-      await this.handleUrlNavigation(userInfo);
-
-      this.onPushTapped?.(userInfo);
-    } catch (error) {
-      ClixLogger.error('Failed to handle push tapped', error);
     }
   }
 
@@ -244,12 +331,41 @@ export class NotificationService {
     try {
       ClixLogger.info('Requesting notification permission');
 
-      // This would typically call the native notification permission request
-      // For now, we'll implement a basic version
-      const status = await this.requestPermissions();
-      const granted = status === 'authorized';
+      const authStatus = await messaging().requestPermission({
+        alert: true,
+        badge: true,
+        sound: true,
+        provisional: false,
+        announcement: false,
+        carPlay: false,
+        criticalAlert: false,
+      });
+
+      let status: 'authorized' | 'denied' | 'not-determined' | 'provisional';
+      let granted = false;
+
+      switch (authStatus) {
+        case messaging.AuthorizationStatus.AUTHORIZED:
+          status = 'authorized';
+          granted = true;
+          break;
+        case messaging.AuthorizationStatus.PROVISIONAL:
+          status = 'provisional';
+          granted = true;
+          break;
+        case messaging.AuthorizationStatus.DENIED:
+          status = 'denied';
+          granted = false;
+          break;
+        default:
+          status = 'not-determined';
+          granted = false;
+      }
 
       ClixLogger.info(`Notification permission granted: ${granted}`);
+
+      // Store permission status
+      await this.storageService?.set('notification_permission_status', status);
 
       return {
         status,
@@ -262,14 +378,6 @@ export class NotificationService {
         granted: false,
       };
     }
-  }
-
-  private async requestPermissions(): Promise<
-    'authorized' | 'denied' | 'not-determined' | 'provisional'
-  > {
-    // This would integrate with platform-specific permission requests
-    // For now, return a default status
-    return 'authorized';
   }
 
   async setNotificationPreferences(
@@ -292,7 +400,7 @@ export class NotificationService {
 
   async subscribeToTopic(topic: string): Promise<void> {
     try {
-      // This would call the native Firebase messaging method
+      await messaging().subscribeToTopic(topic);
       ClixLogger.info(`Subscribed to topic: ${topic}`);
     } catch (error) {
       ClixLogger.error(`Failed to subscribe to topic: ${topic}`, error);
@@ -302,7 +410,7 @@ export class NotificationService {
 
   async unsubscribeFromTopic(topic: string): Promise<void> {
     try {
-      // This would call the native Firebase messaging method
+      await messaging().unsubscribeFromTopic(topic);
       ClixLogger.info(`Unsubscribed from topic: ${topic}`);
     } catch (error) {
       ClixLogger.error(`Failed to unsubscribe from topic: ${topic}`, error);
@@ -313,8 +421,9 @@ export class NotificationService {
   async setBadgeCount(count: number): Promise<void> {
     if (Platform.OS === 'ios') {
       try {
-        // This would call the native iOS badge setting method
-        ClixLogger.info(`Badge count set to: ${count}`);
+        ClixLogger.info(
+          `Badge count set to: ${count} (iOS notification badge management requires manual implementation)`
+        );
       } catch (error) {
         ClixLogger.error('Failed to set badge count', error);
       }
@@ -323,14 +432,21 @@ export class NotificationService {
 
   async reset(): Promise<void> {
     try {
+      // Unsubscribe from listeners
+      this.unsubscribeOnMessage?.();
+      this.unsubscribeOnNotificationOpenedApp?.();
+      this.unsubscribeOnTokenRefresh?.();
+
       await this.storageService?.remove('clix_notification_settings');
       await this.storageService?.remove('clix_last_notification');
+      await this.storageService?.remove('last_background_notification');
 
       if (this.tokenService) {
         await this.tokenService.reset();
       }
 
       this.currentToken = undefined;
+      this.isInitialized = false;
       ClixLogger.info('Notification data reset completed');
     } catch (error) {
       ClixLogger.error('Failed to reset notification data', error);
@@ -394,6 +510,116 @@ export class NotificationService {
 
     if (this.eventService) {
       await this.trackPushEvent('PUSH_NOTIFICATION_RECEIVED', clixPayload);
+    } else {
+      await this.trackPushEventInBackground(clixPayload, messageId);
+    }
+  }
+
+  private async trackPushNotificationReceivedInBackground(
+    clixPayload: Record<string, any>
+  ): Promise<void> {
+    const messageId = clixPayload.message_id as string;
+    if (!messageId) {
+      ClixLogger.warn(
+        'No message_id found in payload, skipping event tracking'
+      );
+      return;
+    }
+
+    try {
+      await this.trackPushEventInBackground(clixPayload, messageId);
+      ClixLogger.info('PUSH_NOTIFICATION_RECEIVED event tracked in background');
+    } catch (error) {
+      ClixLogger.error('Error tracking event in background', error);
+    }
+  }
+
+  private async trackPushEventInBackground(
+    clixPayload: Record<string, any>,
+    messageId: string
+  ): Promise<void> {
+    try {
+      // Import services locally to avoid circular dependencies in background context
+      const { StorageService } = await import('./StorageService');
+      const { TokenService } = await import('./TokenService');
+      const { DeviceService } = await import('./DeviceService');
+      const { EventService } = await import('./EventService');
+      const { DeviceAPIService } = await import('./DeviceAPIService');
+      const { EventAPIService } = await import('./EventAPIService');
+      const { ClixAPIClient } = await import('./ClixAPIClient');
+
+      const storageService = StorageService.getInstance();
+
+      const configData = await storageService.get<ClixConfig>('clix_config');
+      if (!configData) {
+        ClixLogger.error('No Clix config found in storage');
+        return;
+      }
+
+      const deviceId = await storageService.get<string>('clix_device_id');
+      if (!deviceId) {
+        ClixLogger.warn(
+          'No device ID found in storage, cannot track event in background'
+        );
+        return;
+      }
+
+      const config = configData;
+      const properties =
+        NotificationService.extractTrackingProperties(clixPayload);
+
+      const apiClient = new ClixAPIClient(config);
+      const deviceAPIService = new DeviceAPIService(apiClient);
+      const tokenService = new TokenService(storageService);
+
+      const deviceService = new DeviceService(
+        storageService,
+        tokenService,
+        deviceAPIService
+      );
+
+      const eventAPIService = new EventAPIService(apiClient);
+      const eventService = new EventService(eventAPIService, deviceService);
+
+      await eventService.trackEvent(
+        'PUSH_NOTIFICATION_RECEIVED',
+        properties,
+        messageId
+      );
+
+      ClixLogger.info(
+        'PUSH_NOTIFICATION_RECEIVED event tracked via EventService in background'
+      );
+    } catch (error) {
+      ClixLogger.error(
+        'Error tracking event via EventService in background',
+        error
+      );
+    }
+  }
+
+  private async storeBackgroundNotificationData(
+    remoteMessage: FirebaseMessagingTypes.RemoteMessage,
+    clixPayload?: Record<string, any>
+  ): Promise<void> {
+    try {
+      const notificationData = {
+        messageId: remoteMessage.messageId,
+        data: remoteMessage.data,
+        timestamp: Date.now(),
+        clixMessageId: clixPayload?.message_id as string,
+        campaignId: clixPayload?.campaign_id as string,
+        trackingId: clixPayload?.tracking_id as string,
+      };
+
+      const { StorageService } = await import('./StorageService');
+      const storageService = StorageService.getInstance();
+      await storageService.set(
+        'last_background_notification',
+        notificationData
+      );
+    } catch (error) {
+      ClixLogger.error('Failed to store background notification data', error);
     }
   }
 
@@ -403,20 +629,25 @@ export class NotificationService {
       if (savedToken) return savedToken;
     }
 
-    // This would typically call the native Firebase messaging method to get token
-    // For now, we'll return undefined and let it be implemented by the integrating app
-    const token = await this.fetchTokenFromNative();
-    if (token) {
-      ClixLogger.info(`Got FCM token: ${token.substring(0, 20)}...`);
-      await this.tokenService?.saveToken(token);
+    try {
+      const token = await messaging().getToken();
+      if (token) {
+        ClixLogger.info(`Got FCM token: ${token.substring(0, 20)}...`);
+        await this.tokenService?.saveToken(token);
+      }
+      return token;
+    } catch (error) {
+      ClixLogger.error('Failed to fetch FCM token', error);
+      return undefined;
     }
-    return token;
   }
 
-  private async fetchTokenFromNative(): Promise<string | undefined> {
-    // This would be implemented by calling the native Firebase messaging module
-    // For now, return undefined
-    return undefined;
+  private async saveAndRegisterToken(token: string): Promise<void> {
+    if (this.tokenService) {
+      await this.tokenService.saveToken(token);
+      ClixLogger.info('New FCM token saved via TokenService');
+    }
+    await this.registerTokenWithServer(token);
   }
 
   private async registerTokenWithServer(token: string): Promise<void> {

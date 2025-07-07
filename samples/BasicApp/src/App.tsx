@@ -47,41 +47,30 @@ function App() {
         console.info('ClixLogLevel available:', !!ClixLogLevel);
         console.info('ClixLogLevel.Debug value:', ClixLogLevel?.DEBUG);
 
-        // Initialize Clix SDK with push notification handlers
+        // Initialize Clix SDK without push notification handlers
         await Clix.initialize({
           projectId: ClixInfo.projectId,
           apiKey: ClixInfo.apiKey,
           logLevel: logLevel,
-          onPushReceived: (data) => {
-            console.info('Push notification received:', data);
-            setLastNotification({
-              type: 'received',
-              data: data,
-              timestamp: new Date().toISOString(),
-            });
-          },
-          onPushTapped: (data) => {
-            console.info('Push notification tapped:', data);
-            setLastNotification({
-              type: 'tapped',
-              data: data,
-              timestamp: new Date().toISOString(),
-            });
-          },
         });
 
         // Get device information after initialization
         const currentDeviceId = await Clix.getDeviceId();
         const currentPushToken = await Clix.getPushToken();
 
-        // Get notification service for permission status
-        const notificationService = Clix.getNotificationService();
-        const permissionStatus =
-          await notificationService?.requestNotificationPermission();
-
-        setDeviceId(currentDeviceId);
-        setPushToken(currentPushToken);
-        setNotificationPermission(permissionStatus?.status || 'not-determined');
+        // Update state with null if values are undefined
+        setDeviceId(currentDeviceId || null);
+        setPushToken(currentPushToken || null);
+        
+        // Firebase handles notification permissions now
+        const authStatus = await messaging().requestPermission();
+        const enabled =
+          authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+          authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+        
+        setNotificationPermission(
+          enabled ? 'authorized' : 'denied'
+        );
       } catch (error) {
         console.error('Failed to initialize Clix SDK:', error);
         Alert.alert('Error', `Failed to initialize Clix SDK: ${error}`);
@@ -98,11 +87,33 @@ function App() {
           'New Notification',
           remoteMessage.notification?.body || 'You have a new message'
         );
+        
+        // Store last notification information
+        setLastNotification({
+          type: 'received',
+          data: remoteMessage.data,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    );
+    
+    // Listen for notification open events
+    const unsubscribeOnNotificationOpened = messaging().onNotificationOpenedApp(
+      (remoteMessage) => {
+        console.info('Notification opened the app:', remoteMessage);
+        
+        // Store notification information for display
+        setLastNotification({
+          type: 'tapped',
+          data: remoteMessage.data,
+          timestamp: new Date().toISOString(),
+        });
       }
     );
 
     return () => {
       unsubscribeOnMessage();
+      unsubscribeOnNotificationOpened();
     };
   }, []);
 
@@ -141,20 +152,18 @@ function App() {
 
   const handleRequestPermission = async () => {
     try {
-      const notificationService = Clix.getNotificationService();
-      if (!notificationService) {
-        Alert.alert('Error', 'Notification service not available');
-        return;
-      }
+      const authStatus = await messaging().requestPermission();
+      const enabled =
+        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+      
+      setNotificationPermission(enabled ? 'authorized' : 'denied');
 
-      const status = await notificationService.requestNotificationPermission();
-      setNotificationPermission(status?.status || 'denied');
-
-      if (status?.granted) {
+      if (enabled) {
         Alert.alert('Success', 'Notification permission granted');
         // Update push token after permission granted
         const token = await Clix.getPushToken();
-        setPushToken(token);
+        setPushToken(token || null);
       } else {
         Alert.alert(
           'Permission Denied',
@@ -169,13 +178,7 @@ function App() {
 
   const handleSubscribeToTopic = async () => {
     try {
-      const notificationService = Clix.getNotificationService();
-      if (!notificationService) {
-        Alert.alert('Error', 'Notification service not available');
-        return;
-      }
-
-      await notificationService.subscribeToTopic('test-topic');
+      await messaging().subscribeToTopic('test-topic');
       Alert.alert('Success', 'Subscribed to test-topic');
     } catch (error) {
       console.error('Failed to subscribe to topic:', error);
@@ -185,13 +188,7 @@ function App() {
 
   const handleUnsubscribeFromTopic = async () => {
     try {
-      const notificationService = Clix.getNotificationService();
-      if (!notificationService) {
-        Alert.alert('Error', 'Notification service not available');
-        return;
-      }
-
-      await notificationService.unsubscribeFromTopic('test-topic');
+      await messaging().unsubscribeFromTopic('test-topic');
       Alert.alert('Success', 'Unsubscribed from test-topic');
     } catch (error) {
       console.error('Failed to unsubscribe from topic:', error);

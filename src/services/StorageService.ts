@@ -2,85 +2,35 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ClixLogger } from '../utils/logging/ClixLogger';
 
 export class StorageService {
-  private static instance?: StorageService;
-  private memoryStorage: Map<string, string> = new Map();
-  private isAsyncStorageAvailable: boolean = true;
+  private static instance: StorageService;
 
-  constructor() {
-    if (StorageService.instance) {
-      return StorageService.instance;
+  private constructor() {}
+
+  public static getInstance(): StorageService {
+    if (!StorageService.instance) {
+      StorageService.instance = new StorageService();
     }
-    StorageService.instance = this;
-    this.checkAsyncStorageAvailability();
-  }
-
-  private async checkAsyncStorageAvailability(): Promise<void> {
-    try {
-      // Test if AsyncStorage is available
-      if (!AsyncStorage || typeof AsyncStorage.getItem !== 'function') {
-        throw new Error('AsyncStorage is not available');
-      }
-
-      // Try a simple operation to verify it works
-      await AsyncStorage.getItem('__test_key__');
-      this.isAsyncStorageAvailable = true;
-    } catch (error) {
-      ClixLogger.warn(
-        'AsyncStorage is not available, falling back to memory storage',
-        error
-      );
-      this.isAsyncStorageAvailable = false;
-    }
+    return StorageService.instance;
   }
 
   async set<T>(key: string, value: T): Promise<void> {
     try {
       if (value === undefined) {
-        if (this.isAsyncStorageAvailable) {
-          await AsyncStorage.removeItem(key);
-        } else {
-          this.memoryStorage.delete(key);
-        }
+        await AsyncStorage.removeItem(key);
         return;
       }
-
       const encoded = JSON.stringify(value);
-
-      if (this.isAsyncStorageAvailable) {
-        await AsyncStorage.setItem(key, encoded);
-      } else {
-        this.memoryStorage.set(key, encoded);
-      }
+      await AsyncStorage.setItem(key, encoded);
     } catch (error) {
       ClixLogger.error(`Failed to set value for key: ${key}`, error);
-      // If AsyncStorage fails, try fallback to memory storage
-      if (this.isAsyncStorageAvailable) {
-        ClixLogger.warn('AsyncStorage failed, falling back to memory storage');
-        this.isAsyncStorageAvailable = false;
-        if (value !== undefined) {
-          const encoded = JSON.stringify(value);
-          this.memoryStorage.set(key, encoded);
-        } else {
-          this.memoryStorage.delete(key);
-        }
-      } else {
-        throw error;
-      }
+      throw error;
     }
   }
 
   async get<T>(key: string): Promise<T | undefined> {
     try {
-      let data: string | null | undefined;
-
-      if (this.isAsyncStorageAvailable) {
-        data = await AsyncStorage.getItem(key);
-      } else {
-        data = this.memoryStorage.get(key);
-      }
-
+      const data = await AsyncStorage.getItem(key);
       if (data === null || data === undefined) return undefined;
-
       try {
         const decoded = JSON.parse(data);
         return decoded as T;
@@ -94,79 +44,34 @@ export class StorageService {
       }
     } catch (error) {
       ClixLogger.error(`Failed to get value for key: ${key}`, error);
-      // If AsyncStorage fails, try fallback to memory storage
-      if (this.isAsyncStorageAvailable) {
-        ClixLogger.warn('AsyncStorage failed, falling back to memory storage');
-        this.isAsyncStorageAvailable = false;
-        const data = this.memoryStorage.get(key);
-        if (data) {
-          try {
-            return JSON.parse(data) as T;
-          } catch {
-            return data as T;
-          }
-        }
-      }
-      return undefined;
+      throw error;
     }
   }
 
   async remove(key: string): Promise<void> {
     try {
-      if (this.isAsyncStorageAvailable) {
-        await AsyncStorage.removeItem(key);
-      } else {
-        this.memoryStorage.delete(key);
-      }
+      await AsyncStorage.removeItem(key);
     } catch (error) {
       ClixLogger.error(`Failed to remove key: ${key}`, error);
-      // If AsyncStorage fails, try fallback to memory storage
-      if (this.isAsyncStorageAvailable) {
-        ClixLogger.warn('AsyncStorage failed, falling back to memory storage');
-        this.isAsyncStorageAvailable = false;
-        this.memoryStorage.delete(key);
-      } else {
-        throw error;
-      }
+      throw error;
     }
   }
 
   async clear(): Promise<void> {
     try {
-      if (this.isAsyncStorageAvailable) {
-        await AsyncStorage.clear();
-      } else {
-        this.memoryStorage.clear();
-      }
+      await AsyncStorage.clear();
     } catch (error) {
       ClixLogger.error('Failed to clear storage', error);
-      // If AsyncStorage fails, try fallback to memory storage
-      if (this.isAsyncStorageAvailable) {
-        ClixLogger.warn('AsyncStorage failed, falling back to memory storage');
-        this.isAsyncStorageAvailable = false;
-        this.memoryStorage.clear();
-      } else {
-        throw error;
-      }
+      throw error;
     }
   }
 
   async getAllKeys(): Promise<string[]> {
     try {
-      if (this.isAsyncStorageAvailable) {
-        const keys = await AsyncStorage.getAllKeys();
-        return Array.from(keys);
-      } else {
-        return Array.from(this.memoryStorage.keys());
-      }
+      const keys = await AsyncStorage.getAllKeys();
+      return Array.from(keys);
     } catch (error) {
       ClixLogger.error('Failed to get all keys', error);
-      // If AsyncStorage fails, try fallback to memory storage
-      if (this.isAsyncStorageAvailable) {
-        ClixLogger.warn('AsyncStorage failed, falling back to memory storage');
-        this.isAsyncStorageAvailable = false;
-        return Array.from(this.memoryStorage.keys());
-      }
       return [];
     }
   }

@@ -1,6 +1,6 @@
-import React from 'react';
-import { StyleSheet, View, Text } from 'react-native';
 import Clix from '@clix/react-native-sdk';
+import React from 'react';
+import { StyleSheet, Text, View } from 'react-native';
 import { renderButtonView } from './Helpers';
 
 interface ClixButtonsProps {
@@ -119,42 +119,6 @@ class ClixButtons extends React.Component<ClixButtonsProps> {
     ];
   }
 
-  createEventTrackingButtons() {
-    const { loggingFunction, inputFieldValue } = this.props;
-
-    const trackEventButton = renderButtonView('Track Event', async () => {
-      try {
-        await Clix.trackEvent(inputFieldValue || 'default_event');
-        loggingFunction(`Event tracked: ${inputFieldValue || 'default_event'}`);
-      } catch (error) {
-        loggingFunction('Failed to track event: ', error);
-      }
-    });
-
-    const trackEventWithPropertiesButton = renderButtonView(
-      'Track Event With Properties',
-      async () => {
-        try {
-          await Clix.trackEvent(inputFieldValue || 'default_event', {
-            properties: {
-              property1: 'value1',
-              property2: 'value2',
-            },
-          });
-          loggingFunction(
-            `Event with properties tracked: ${
-              inputFieldValue || 'default_event'
-            }`
-          );
-        } catch (error) {
-          loggingFunction('Failed to track event with properties: ', error);
-        }
-      }
-    );
-
-    return [trackEventButton, trackEventWithPropertiesButton];
-  }
-
   createLogLevelButtons() {
     const { loggingFunction } = this.props;
 
@@ -217,10 +181,6 @@ class ClixButtons extends React.Component<ClixButtonsProps> {
         <Text style={styles.sectionTitle}>User Properties</Text>
         <View style={styles.divider} />
         {this.createUserPropertiesButtons()}
-
-        <Text style={styles.sectionTitle}>Event Tracking</Text>
-        <View style={styles.divider} />
-        {this.createEventTrackingButtons()}
 
         <Text style={styles.sectionTitle}>Log Level</Text>
         <View style={styles.divider} />
