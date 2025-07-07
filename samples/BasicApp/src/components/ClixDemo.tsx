@@ -1,18 +1,18 @@
+import Clix, { ClixLogLevel } from '@clix/react-native-sdk';
 import React from 'react';
 import {
   Alert,
-  StyleSheet,
-  View,
-  ScrollView,
   SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
   TextInput,
+  View,
 } from 'react-native';
-import { Text } from 'react-native';
-import Clix, { ClixLogLevel } from '@clix/react-native-sdk';
+import { ClixInfo } from '../ClixInfo';
 import ClixButtons from './ClixButtons';
 import ClixConsole from './ClixConsole';
 import { renderButtonView } from './Helpers';
-import { ClixInfo } from '../ClixInfo';
 
 interface Props {
   name: string;
@@ -71,7 +71,7 @@ class ClixDemo extends React.Component<Props, State> {
       }
     }
 
-    console.log(logMessage);
+    console.info(logMessage);
 
     let consoleValue;
     if (this.state.consoleValue) {

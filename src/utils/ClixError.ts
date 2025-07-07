@@ -1,51 +1,78 @@
+export enum ClixErrorCode {
+  NOT_INITIALIZED = 'NOT_INITIALIZED',
+  INVALID_CONFIGURATION = 'INVALID_CONFIGURATION',
+  INVALID_URL = 'INVALID_URL',
+  INVALID_RESPONSE = 'INVALID_RESPONSE',
+  ENCODING_ERROR = 'ENCODING_ERROR',
+  DECODING_ERROR = 'DECODING_ERROR',
+  NETWORK_ERROR = 'NETWORK_ERROR',
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR',
+}
+
+const ClixErrorMessages: Record<ClixErrorCode, string> = {
+  [ClixErrorCode.NOT_INITIALIZED]:
+    'Clix SDK is not initialized. Call Clix.initialize() first.',
+  [ClixErrorCode.INVALID_CONFIGURATION]: 'Invalid SDK configuration.',
+  [ClixErrorCode.INVALID_URL]: 'The provided URL is invalid.',
+  [ClixErrorCode.INVALID_RESPONSE]:
+    'The response was invalid or permission was denied.',
+  [ClixErrorCode.ENCODING_ERROR]: 'Failed to encode request body.',
+  [ClixErrorCode.DECODING_ERROR]: 'Failed to decode response body.',
+  [ClixErrorCode.NETWORK_ERROR]: 'Network request failed.',
+  [ClixErrorCode.UNKNOWN_ERROR]: 'An unknown error occurred.',
+};
+
 export class ClixError extends Error {
-  static readonly NOT_INITIALIZED =
-    'Clix SDK is not initialized. Call Clix.initialize() first.';
-  static readonly INVALID_CONFIGURATION = 'Invalid SDK configuration.';
-  static readonly INVALID_URL = 'The provided URL is invalid.';
-  static readonly INVALID_RESPONSE =
-    'The response was invalid or permission was denied.';
-  static readonly ENCODING_ERROR = 'Failed to encode request body.';
-  static readonly UNKNOWN_ERROR = 'An unknown error occurred.';
+  readonly code: ClixErrorCode;
+  override cause?: unknown;
 
-  constructor(message: string) {
-    super(message);
+  constructor(
+    code: ClixErrorCode,
+    message?: string,
+    options?: { cause?: unknown }
+  ) {
+    super(message ?? ClixErrorMessages[code]);
     this.name = 'ClixError';
+    this.code = code;
+    if (options?.cause) {
+      this.cause = options.cause;
+    }
   }
 
-  static notInitialized(): ClixError {
-    return new ClixError(this.NOT_INITIALIZED);
+  static notInitialized(options?: { cause?: unknown }) {
+    return new ClixError(ClixErrorCode.NOT_INITIALIZED, undefined, options);
   }
-
-  static invalidConfiguration(): ClixError {
-    return new ClixError(this.INVALID_CONFIGURATION);
+  static invalidConfiguration(options?: { cause?: unknown }) {
+    return new ClixError(
+      ClixErrorCode.INVALID_CONFIGURATION,
+      undefined,
+      options
+    );
   }
-
-  static invalidURL(): ClixError {
-    return new ClixError(this.INVALID_URL);
+  static invalidURL(options?: { cause?: unknown }) {
+    return new ClixError(ClixErrorCode.INVALID_URL, undefined, options);
   }
-
-  static invalidResponse(): ClixError {
-    return new ClixError(this.INVALID_RESPONSE);
+  static invalidResponse(options?: { cause?: unknown }) {
+    return new ClixError(ClixErrorCode.INVALID_RESPONSE, undefined, options);
   }
-
-  static encodingError(): ClixError {
-    return new ClixError(this.ENCODING_ERROR);
+  static encodingError(options?: { cause?: unknown }) {
+    return new ClixError(ClixErrorCode.ENCODING_ERROR, undefined, options);
   }
-
-  static unknownError(): ClixError {
-    return new ClixError(this.UNKNOWN_ERROR);
+  static decodingError(options?: { cause?: unknown }) {
+    return new ClixError(ClixErrorCode.DECODING_ERROR, undefined, options);
   }
-
-  static networkError(underlyingError: string): ClixError {
-    return new ClixError(`Network request failed: ${underlyingError}`);
+  static networkError(underlyingError: unknown) {
+    return new ClixError(ClixErrorCode.NETWORK_ERROR, undefined, {
+      cause: underlyingError,
+    });
   }
-
-  static decodingError(underlyingError: string): ClixError {
-    return new ClixError(`Failed to decode response body: ${underlyingError}`);
-  }
-
-  static unknownErrorWithReason(reason: string): ClixError {
-    return new ClixError(`An unknown error occurred: ${reason}`);
+  static unknownError(options?: { cause?: unknown; reason?: string }) {
+    const msg =
+      options?.reason != null
+        ? `${ClixErrorMessages[ClixErrorCode.UNKNOWN_ERROR]}: ${options.reason}`
+        : undefined;
+    return new ClixError(ClixErrorCode.UNKNOWN_ERROR, msg, {
+      cause: options?.cause,
+    });
   }
 }

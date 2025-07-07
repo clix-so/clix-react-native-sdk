@@ -5,23 +5,23 @@
  * @format
  */
 
+import Clix, { ClixLogLevel } from '@clix/react-native-sdk';
+import messaging from '@react-native-firebase/messaging';
+import { useEffect, useState } from 'react';
 import {
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
   StatusBar,
   StyleSheet,
   Text,
-  View,
   TextInput,
   TouchableOpacity,
-  Image,
-  ScrollView,
   useColorScheme,
-  SafeAreaView,
-  Alert,
+  View,
 } from 'react-native';
-import Clix, { ClixLogLevel } from '@clix/react-native-sdk';
 import { ClixInfo } from './ClixInfo';
-import { useState, useEffect } from 'react';
-import messaging from '@react-native-firebase/messaging';
 
 function App() {
   // Theme configuration
@@ -44,8 +44,8 @@ function App() {
         // Use a fallback log level if ClixLogLevel.Debug is not available
         const logLevel = ClixLogLevel?.DEBUG ?? 4; // 4 is Debug level
 
-        console.log('ClixLogLevel available:', !!ClixLogLevel);
-        console.log('ClixLogLevel.Debug value:', ClixLogLevel?.DEBUG);
+        console.info('ClixLogLevel available:', !!ClixLogLevel);
+        console.info('ClixLogLevel.Debug value:', ClixLogLevel?.DEBUG);
 
         // Initialize Clix SDK with push notification handlers
         await Clix.initialize({
@@ -53,7 +53,7 @@ function App() {
           apiKey: ClixInfo.apiKey,
           logLevel: logLevel,
           onPushReceived: (data) => {
-            console.log('Push notification received:', data);
+            console.info('Push notification received:', data);
             setLastNotification({
               type: 'received',
               data: data,
@@ -61,7 +61,7 @@ function App() {
             });
           },
           onPushTapped: (data) => {
-            console.log('Push notification tapped:', data);
+            console.info('Push notification tapped:', data);
             setLastNotification({
               type: 'tapped',
               data: data,
@@ -93,7 +93,7 @@ function App() {
     // Set up Firebase messaging listeners
     const unsubscribeOnMessage = messaging().onMessage(
       async (remoteMessage) => {
-        console.log('FCM Message received in foreground:', remoteMessage);
+        console.info('FCM Message received in foreground:', remoteMessage);
         Alert.alert(
           'New Notification',
           remoteMessage.notification?.body || 'You have a new message'

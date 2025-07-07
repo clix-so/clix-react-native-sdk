@@ -64,17 +64,18 @@
     "@react-native-firebase/messaging": "*",
     "react": "*",
     "react-native": "*",
-    "react-native-device-info": "*"
+    "react-native-device-info": "*",
+    "uuid": "*"
   },
   "devDependencies": {
     "@commitlint/config-conventional": "19.6.0",
     "@evilmartians/lefthook": "1.5.0",
+    "@react-native-async-storage/async-storage": "1.24.0",
     "@react-native-community/cli": "15.0.0",
     "@react-native-community/eslint-config": "2.0.0",
-    "@react-native/babel-preset": "0.76.9",
-    "@react-native-async-storage/async-storage": "1.24.0",
     "@react-native-firebase/app": "19.3.0",
     "@react-native-firebase/messaging": "19.3.0",
+    "@react-native/babel-preset": "0.76.9",
     "@release-it/conventional-changelog": "9.0.2",
     "@types/jest": "29.5.5",
     "@types/react": "18.3.12",
@@ -91,7 +92,8 @@
     "react-native-builder-bob": "0.40.12",
     "react-native-device-info": "13.2.0",
     "release-it": "17.10.0",
-    "typescript": "5.8.3"
+    "typescript": "5.8.3",
+    "uuid": "11.1.0"
   },
   "jest": {
     "preset": "react-native",

@@ -1,9 +1,11 @@
 import { Platform } from 'react-native';
+import DeviceInfo from 'react-native-device-info';
+import { v4 as uuidv4 } from 'uuid';
 import { ClixVersion } from '../core/ClixVersion';
 import { ClixDevice } from '../models/ClixDevice';
 import { ClixUserProperty } from '../models/ClixUserProperty';
-import { ClixLogger } from '../utils/logging/ClixLogger';
 import { ClixError } from '../utils/ClixError';
+import { ClixLogger } from '../utils/logging/ClixLogger';
 import { DeviceAPIService } from './DeviceAPIService';
 import { StorageService } from './StorageService';
 import { TokenService } from './TokenService';
@@ -25,18 +27,9 @@ export class DeviceService {
       return existingId;
     }
 
-    // Generate UUID v4
-    const newId = this.generateUUID();
+    const newId = uuidv4();
     await this.storageService.set(DeviceService.DEVICE_ID_KEY, newId);
     return newId;
-  }
-
-  private generateUUID(): string {
-    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
-      const r = Math.floor(Math.random() * 16);
-      const v = c === 'x' ? r : (r % 4) + 8;
-      return v.toString(16);
-    });
   }
 
   async setProjectUserId(projectUserId: string): Promise<void> {
@@ -46,9 +39,10 @@ export class DeviceService {
       ClixLogger.info(`Project user ID set: ${projectUserId}`);
     } catch (error) {
       ClixLogger.error('Failed to set project user ID', error);
-      throw ClixError.unknownErrorWithReason(
-        `Failed to set project user ID: ${error}`
-      );
+      throw ClixError.unknownError({
+        reason: `Failed to set project user ID: ${error}`,
+        cause: error,
+      });
     }
   }
 
@@ -59,9 +53,10 @@ export class DeviceService {
       ClixLogger.info('Project user ID removed');
     } catch (error) {
       ClixLogger.error('Failed to remove project user ID', error);
-      throw ClixError.unknownErrorWithReason(
-        `Failed to remove project user ID: ${error}`
-      );
+      throw ClixError.unknownError({
+        reason: `Failed to remove project user ID: ${error}`,
+        cause: error,
+      });
     }
   }
 
@@ -82,9 +77,10 @@ export class DeviceService {
       );
     } catch (error) {
       ClixLogger.error('Failed to update user properties', error);
-      throw ClixError.unknownErrorWithReason(
-        `Failed to update user properties: ${error}`
-      );
+      throw ClixError.unknownError({
+        reason: `Failed to update user properties: ${error}`,
+        cause: error,
+      });
     }
   }
 
@@ -96,9 +92,10 @@ export class DeviceService {
       ClixLogger.info(`User properties removed: ${names.join(', ')}`);
     } catch (error) {
       ClixLogger.error('Failed to remove user properties', error);
-      throw ClixError.unknownErrorWithReason(
-        `Failed to remove user properties: ${error}`
-      );
+      throw ClixError.unknownError({
+        reason: `Failed to remove user properties: ${error}`,
+        cause: error,
+      });
     }
   }
 
@@ -114,34 +111,27 @@ export class DeviceService {
       ClixLogger.info(`Token upserted: ${tokenType}`);
     } catch (error) {
       ClixLogger.error('Failed to upsert token', error);
-      throw ClixError.unknownErrorWithReason(
-        `Failed to upsert token: ${error}`
-      );
+      throw ClixError.unknownError({
+        reason: `Failed to upsert token: ${error}`,
+        cause: error,
+      });
     }
   }
 
   async createDevice(deviceId: string, token?: string): Promise<ClixDevice> {
-    // Use Platform API and reasonable defaults
-    const platform = Platform.OS === 'ios' ? 'iOS' : 'Android';
-    const osName = Platform.OS === 'ios' ? 'iOS' : 'Android';
-    const osVersion = Platform.Version?.toString() || 'Unknown';
-
-    // Set reasonable defaults for device info
-    const manufacturer = Platform.OS === 'ios' ? 'Apple' : 'Android';
-    const model = Platform.OS === 'ios' ? 'iPhone' : 'Android Device';
-    const appName = 'React Native App';
-    const appVersion = '1.0.0';
-
-    // Locale and timezone info using JavaScript APIs
+    const platform = DeviceInfo.getSystemName();
+    const osName = DeviceInfo.getSystemName();
+    const osVersion = DeviceInfo.getSystemVersion();
+    const manufacturer = await DeviceInfo.getManufacturer();
+    const model = DeviceInfo.getModel();
+    const appName = DeviceInfo.getApplicationName();
+    const appVersion = DeviceInfo.getVersion();
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const locale = Intl.DateTimeFormat().resolvedOptions();
-    const localeLanguage = locale.locale?.split('-')[0] || 'en';
-    const localeRegion = locale.locale?.split('-')[1] || 'US';
-
-    // For push permission, we'll handle this in NotificationService
-    // For now, we'll set it to false and update it later
+    const locale = Intl.DateTimeFormat().resolvedOptions().locale || 'en-US';
+    const localeLanguage = locale.split('-')[0] || 'en';
+    const localeRegion = locale.split('-')[1] || 'US';
+    let adId: string | undefined;
     const isPushPermissionGranted = false;
-
     const sdkVersion = await ClixVersion.getVersion();
 
     return new ClixDevice({
@@ -158,10 +148,14 @@ export class DeviceService {
       appVersion,
       sdkType: 'react-native',
       sdkVersion,
-      adId: undefined, // We'll handle advertising ID separately if needed
+      adId,
       isPushPermissionGranted,
       pushToken: token,
-      pushTokenType: token ? 'FCM' : undefined,
+      pushTokenType: token
+        ? Platform.OS === 'ios'
+          ? 'APNS'
+          : 'FCM'
+        : undefined,
     });
   }
 }
