@@ -87,12 +87,12 @@ export class Clix {
     this.eventService = new EventService(eventAPIService, this.deviceService);
     this.notificationService = new NotificationService();
     try {
-      await this.notificationService.initialize({
-        eventService: this.eventService,
-        storageService: this.storageService,
-        deviceService: this.deviceService,
-        tokenService: tokenService,
-      });
+      await this.notificationService.initialize(
+        this.eventService,
+        this.storageService,
+        this.deviceService,
+        tokenService
+      );
     } catch (error) {
       ClixLogger.warn(
         'Failed to fully initialize notification service, some features may be limited',
@@ -222,8 +222,6 @@ export class Clix {
       return undefined;
     }
   }
-
-
 
   /**
    * Set log level

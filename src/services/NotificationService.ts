@@ -1,98 +1,71 @@
+import notifee, {
+  AndroidImportance,
+  AndroidStyle,
+  EventType,
+  type Notification as NotifeeNotification,
+} from '@notifee/react-native';
 import messaging, {
   FirebaseMessagingTypes,
 } from '@react-native-firebase/messaging';
+import { Linking, Platform } from 'react-native';
+import { v4 as uuidv4 } from 'uuid';
+import type { ClixConfig } from '../core/ClixConfig';
 import { ClixPushNotificationPayload } from '../models/ClixPushNotificationPayload';
 import { ClixLogger } from '../utils/logging/ClixLogger';
+import { ClixAPIClient } from './ClixAPIClient';
+import { DeviceAPIService } from './DeviceAPIService';
 import { DeviceService } from './DeviceService';
+import { EventAPIService } from './EventAPIService';
 import { EventService } from './EventService';
 import { StorageService } from './StorageService';
 import { TokenService } from './TokenService';
 
-export enum PushNotificationEvent {
-  RECEIVED = 'PUSH_NOTIFICATION_RECEIVED',
-  TAPPED = 'PUSH_NOTIFICATION_TAPPED',
-}
-
-export interface NotificationPermissionStatus {
-  status: FirebaseMessagingTypes.AuthorizationStatus;
-  granted: boolean;
-}
-
-export interface NotificationContent {
+interface NotificationContent {
   title: string;
   body: string;
   imageUrl?: string;
 }
 
 export class NotificationService {
-  private static readonly STORAGE_KEYS = {
-    NOTIFICATION_SETTINGS: 'clix_notification_settings',
-    NOTIFICATION_PERMISSION_STATUS: 'notification_permission_status',
-    LAST_NOTIFICATION: 'clix_last_notification',
-    LAST_BACKGROUND_NOTIFICATION: 'last_background_notification',
-    CLIX_CONFIG: 'clix_config',
-    DEVICE_ID: 'clix_device_id',
-  } as const;
+  private static readonly CHANNEL_ID = 'clix_channel';
+  private static readonly CHANNEL_NAME = 'Clix Notifications';
 
-  private static readonly DEFAULT_NOTIFICATION_ICON = 'ic_launcher';
-  private static readonly NOTIFICATION_CHANNEL_ID = 'clix_channel';
-  private static readonly NOTIFICATION_CHANNEL_NAME = 'Clix Notifications';
+  private firebaseMessaging = messaging();
+  private isInitialized = false;
+  private currentToken: string | null = null;
 
-  private storageService?: StorageService;
+  private eventService!: EventService;
+  private storageService!: StorageService;
   private deviceService?: DeviceService;
   private tokenService?: TokenService;
-  private eventService?: EventService;
 
-  private isInitialized = false;
-  private currentToken?: string;
+  private unsubscribeForegroundMessage?: () => void;
+  private unsubscribeNotificationOpened?: () => void;
+  private unsubscribeTokenRefresh?: () => void;
 
-  private backgroundHandler?: void;
-  private unsubscribeOnTokenRefresh?: () => void;
-  private unsubscribeOnMessage?: () => void;
-  private unsubscribeOnMessageOpenedApp?: () => void;
-
-  constructor() {}
-
-  async initialize({
-    eventService,
-    storageService,
-    deviceService,
-    tokenService,
-  }: {
-    eventService: EventService;
-    storageService: StorageService;
-    deviceService: DeviceService;
-    tokenService: TokenService;
-  }): Promise<void> {
+  async initialize(
+    eventService: EventService,
+    storageService: StorageService,
+    deviceService?: DeviceService,
+    tokenService?: TokenService
+  ): Promise<void> {
     if (this.isInitialized) return;
-
-    this.storageService = storageService;
-    this.deviceService = deviceService;
-    this.tokenService = tokenService;
-    this.eventService = eventService;
-
     try {
       ClixLogger.info('Initializing notification service');
-
-      const permissionStatus = await this.requestPermissions();
-
-      if (!permissionStatus.granted) {
-        ClixLogger.warn(
-          'Push notification permission denied. User needs to enable it manually in Settings.'
-        );
-      }
-
-      this.setupForegroundMessageHandlers();
-
-      if (permissionStatus.granted) {
+      this.eventService = eventService;
+      this.storageService = storageService;
+      this.deviceService = deviceService;
+      this.tokenService = tokenService;
+      await this.initializeNotifications();
+      this.registerBackgroundHandler();
+      this.setupMessageHandlers();
+      const settings = await this.requestPermission();
+      if (settings !== messaging.AuthorizationStatus.DENIED) {
         await this.getAndUpdateToken();
         this.setupTokenRefreshListener();
       } else {
-        ClixLogger.info('Skipping token setup due to denied permissions');
+        ClixLogger.warn('Push notification permission denied');
       }
-
-      await this.initializeLocalNotifications();
-
       this.isInitialized = true;
       ClixLogger.info('Notification service initialized successfully');
     } catch (error) {
@@ -101,693 +74,529 @@ export class NotificationService {
     }
   }
 
-  async requestPermissions(): Promise<NotificationPermissionStatus> {
-    try {
-      const authStatus = await messaging().requestPermission({
-        alert: true,
-        badge: true,
-        sound: true,
-        provisional: false,
-        announcement: false,
-        carPlay: false,
-        criticalAlert: false,
+  private async initializeNotifications(): Promise<void> {
+    await notifee.requestPermission({ alert: true, badge: true, sound: true });
+    if (Platform.OS === 'android') {
+      await notifee.createChannel({
+        id: NotificationService.CHANNEL_ID,
+        name: NotificationService.CHANNEL_NAME,
+        description: 'Notifications from Clix',
+        importance: AndroidImportance.HIGH,
+        sound: 'default',
+        vibration: true,
+        lights: true,
       });
-
-      ClixLogger.info(`Notification permission status: ${authStatus}`);
-
-      let status: FirebaseMessagingTypes.AuthorizationStatus;
-      let granted = false;
-
-      switch (authStatus) {
-        case messaging.AuthorizationStatus.AUTHORIZED:
-          status = messaging.AuthorizationStatus.AUTHORIZED;
-          granted = true;
-          break;
-        case messaging.AuthorizationStatus.PROVISIONAL:
-          status = messaging.AuthorizationStatus.PROVISIONAL;
-          granted = true;
-          break;
-        case messaging.AuthorizationStatus.DENIED:
-          status = messaging.AuthorizationStatus.DENIED;
-          granted = false;
-          break;
-        default:
-          status = messaging.AuthorizationStatus.NOT_DETERMINED;
-          granted = false;
-      }
-
-      await this.storageService?.set(
-        NotificationService.STORAGE_KEYS.NOTIFICATION_PERMISSION_STATUS,
-        status
-      );
-
-      return { status, granted };
-    } catch (error) {
-      ClixLogger.error('Failed to request permissions', error);
-      return { status: messaging.AuthorizationStatus.DENIED, granted: false };
     }
+    notifee.onForegroundEvent(async ({ type, detail }) => {
+      if (type === EventType.PRESS && detail.notification?.data) {
+        await this.handleNotificationTap(detail.notification.data ?? {});
+      }
+    });
   }
 
-  setupBackgroundMessageHandler(): void {
-    if (this.backgroundHandler) {
-      return;
-    }
-    this.backgroundHandler = messaging().setBackgroundMessageHandler(
+  private registerBackgroundHandler(): void {
+    this.firebaseMessaging.setBackgroundMessageHandler(
       async (remoteMessage) => {
-        await this.handleBackgroundMessage(remoteMessage);
+        try {
+          ClixLogger.info(
+            'Background message received:',
+            remoteMessage.messageId
+          );
+          const clixPayload = this.parseClixPayload(remoteMessage.data ?? {});
+          if (!clixPayload) return;
+          await this.handleBackgroundMessage(remoteMessage, clixPayload);
+        } catch (error) {
+          ClixLogger.error('Background message handler error:', error);
+        }
       }
     );
-    ClixLogger.debug('Background message handler setup completed');
   }
 
   private async handleBackgroundMessage(
-    remoteMessage: FirebaseMessagingTypes.RemoteMessage
-  ): Promise<void> {
-    try {
-      ClixLogger.info(
-        `Background message received: ${remoteMessage.messageId}`
-      );
-
-      const clixPayload = this.parseClixPayloadFromMessage(remoteMessage);
-      if (!clixPayload) {
-        ClixLogger.warn('No Clix payload found in background message');
-        return;
-      }
-
-      if (this.storageService) {
-        await this.storeBackgroundNotificationData(
-          this.storageService,
-          remoteMessage,
-          clixPayload
-        );
-      }
-
-      if (!remoteMessage.notification) {
-        await this.showLocalNotification(remoteMessage, clixPayload);
-      }
-    } catch (error) {
-      ClixLogger.error('Failed to handle background message', error);
-    }
-  }
-
-  public convertToRecord(
-    clixPayload: ClixPushNotificationPayload
-  ): Record<string, any> {
-    return {
-      message_id: clixPayload.messageId,
-      campaign_id: clixPayload.campaignId,
-      user_id: clixPayload.userId,
-      device_id: clixPayload.deviceId,
-      tracking_id: clixPayload.trackingId,
-      landing_url: clixPayload.landingUrl,
-      image_url: clixPayload.imageUrl,
-      custom_properties: clixPayload.customProperties,
-    };
-  }
-
-  public parseClixPayload(
-    userInfo: Record<string, any>
-  ): ClixPushNotificationPayload | undefined {
-    try {
-      let clixData: Record<string, any> | undefined;
-
-      // Check for nested clix data
-      if (userInfo.clix) {
-        const clixRawData = userInfo.clix;
-        if (typeof clixRawData === 'object') {
-          clixData = clixRawData as Record<string, any>;
-        }
-        if (typeof clixRawData === 'string') {
-          try {
-            clixData = JSON.parse(clixRawData) as Record<string, any>;
-          } catch (parseError) {
-            ClixLogger.warn('Failed to parse clix string data', parseError);
-          }
-        }
-      }
-
-      // Check for direct Clix keys in userInfo
-      if (!clixData) {
-        const CLIX_KEYS = [
-          'message_id',
-          'campaign_id',
-          'user_id',
-          'device_id',
-          'tracking_id',
-          'clix_notification_id', // Support Firebase direct format
-        ] as const;
-        if (CLIX_KEYS.some((key) => userInfo[key] !== undefined)) {
-          clixData = userInfo;
-        }
-      }
-
-      if (clixData && (clixData.message_id || clixData.clix_notification_id)) {
-        return new ClixPushNotificationPayload({
-          messageId: clixData.message_id || clixData.clix_notification_id || '',
-          campaignId: clixData.campaign_id,
-          userId: clixData.user_id,
-          deviceId: clixData.device_id,
-          trackingId: clixData.tracking_id,
-          landingUrl: clixData.landing_url || clixData.deep_link,
-          imageUrl: clixData.image_url,
-          customProperties: clixData.custom_properties || clixData,
-        });
-      }
-
-      return undefined;
-    } catch (error) {
-      ClixLogger.error('Failed to parse Clix payload', error);
-      return undefined;
-    }
-  }
-
-  private parseClixPayloadFromMessage(
-    remoteMessage: FirebaseMessagingTypes.RemoteMessage
-  ): ClixPushNotificationPayload | null {
-    try {
-      const data = remoteMessage.data || {};
-
-      // Use parseClixPayload method
-      const clixPayload = this.parseClixPayload(data);
-      if (clixPayload) {
-        return clixPayload;
-      }
-
-      // Fallback parsing for direct Firebase message format
-      if (!data.clix_notification_id) {
-        return null;
-      }
-
-      return new ClixPushNotificationPayload({
-        messageId:
-          typeof data.clix_notification_id === 'string'
-            ? data.clix_notification_id
-            : '',
-        landingUrl:
-          typeof data.deep_link === 'string' ? data.deep_link : undefined,
-        imageUrl:
-          typeof data.image_url === 'string' ? data.image_url : undefined,
-        customProperties: data,
-      });
-    } catch (error) {
-      ClixLogger.error('Failed to parse Clix payload from message', error);
-      return null;
-    }
-  }
-
-  async initializeLocalNotifications(): Promise<void> {
-    try {
-      if (Platform.OS === 'android') {
-        await notifee.createChannel({
-          id: NotificationService.NOTIFICATION_CHANNEL_ID,
-          name: NotificationService.NOTIFICATION_CHANNEL_NAME,
-          importance: AndroidImportance.HIGH,
-          sound: 'default',
-          vibration: true,
-        });
-      }
-
-      notifee.onForegroundEvent(({ type, detail }) => {
-        switch (type) {
-          case EventType.PRESS:
-            ClixLogger.info('Notification tapped (foreground)');
-            this.handleNotificationTap(detail.notification?.data || {});
-            break;
-          default:
-            ClixLogger.debug(`Notifee foreground event: ${type}`);
-        }
-      });
-
-      notifee.onBackgroundEvent(async ({ type, detail }) => {
-        switch (type) {
-          case EventType.PRESS:
-            ClixLogger.info('Notification tapped (background)');
-            await this.handleNotificationTap(detail.notification?.data || {});
-            break;
-          default:
-            ClixLogger.debug(`Notifee background event: ${type}`);
-        }
-      });
-
-      ClixLogger.debug('Local notification initialization completed');
-    } catch (error) {
-      ClixLogger.error('Failed to initialize local notifications', error);
-      throw error;
-    }
-  }
-
-  async showLocalNotification(
+    remoteMessage: FirebaseMessagingTypes.RemoteMessage,
     clixPayload: ClixPushNotificationPayload
   ): Promise<void> {
-    try {
-      const notificationContent = {
-        title: (clixPayload.customProperties?.title as string) || 'New Message',
-        body: (clixPayload.customProperties?.body as string) || '',
-        imageUrl: clixPayload.imageUrl,
-      };
-      ClixLogger.debug(
-        `Showing local notification: ${notificationContent.title} - ${notificationContent.body}`
-      );
-
-      const imageUrl = notificationContent.imageUrl;
-
-      await notifee.displayNotification({
-        id: clixPayload.messageId,
-        title: notificationContent.title,
-        body: notificationContent.body,
-        data: clixPayload.customProperties || {},
-        android: {
-          channelId: NotificationService.NOTIFICATION_CHANNEL_ID,
-          importance: AndroidImportance.HIGH,
-          smallIcon: NotificationService.DEFAULT_NOTIFICATION_ICON,
-          largeIcon: imageUrl,
-          style: imageUrl
-            ? {
-                type: AndroidStyle.BIGPICTURE,
-                picture: imageUrl,
-              }
-            : undefined,
-          pressAction: {
-            id: 'default',
-          },
-        },
-        ios: {
-          attachments: imageUrl
-            ? [
-                {
-                  url: imageUrl,
-                },
-              ]
-            : undefined,
-        },
-      });
-
-      ClixLogger.info('Local notification displayed successfully', {
-        messageId: clixPayload.messageId,
-        title: notificationContent.title,
-      });
-    } catch (error) {
-      ClixLogger.error('Failed to show local notification', error);
+    const storageService = new StorageService();
+    await storageService.set('last_background_notification', {
+      messageId: remoteMessage.messageId,
+      data: remoteMessage.data ?? {},
+      timestamp: Date.now(),
+      clixMessageId: clixPayload.messageId,
+      campaignId: clixPayload.campaignId,
+      trackingId: clixPayload.trackingId,
+    });
+    await this.trackEventInBackground(clixPayload);
+    if (!remoteMessage.notification) {
+      await this.showBackgroundNotification(remoteMessage, clixPayload);
     }
   }
 
-  private setupForegroundMessageHandlers(): void {
-    this.unsubscribeOnMessage = messaging().onMessage(this.onForegroundMessage);
-    this.unsubscribeOnMessageOpenedApp = messaging().onNotificationOpenedApp(
-      this.onMessageOpenedApp
+  private setupMessageHandlers(): void {
+    this.unsubscribeForegroundMessage = this.firebaseMessaging.onMessage(
+      async (remoteMessage) => {
+        await this.onForegroundMessage(remoteMessage);
+      }
     );
-    this.handleInitialMessage();
-
-    ClixLogger.debug('Foreground message handlers setup completed');
+    this.unsubscribeNotificationOpened =
+      this.firebaseMessaging.onNotificationOpenedApp(async (remoteMessage) => {
+        await this.handleNotificationTap(remoteMessage.data ?? {});
+      });
+    this.checkInitialNotification();
   }
 
-  private async handleForegroundPushNotification(
+  private async checkInitialNotification(): Promise<void> {
+    try {
+      const initialNotification =
+        await this.firebaseMessaging.getInitialNotification();
+      if (initialNotification) {
+        ClixLogger.info(
+          'App launched from notification:',
+          initialNotification.messageId
+        );
+        await this.handleNotificationTap(initialNotification.data ?? {});
+      }
+    } catch (error) {
+      ClixLogger.error('Failed to handle initial notification', error);
+    }
+  }
+
+  private async requestPermission(): Promise<FirebaseMessagingTypes.AuthorizationStatus> {
+    const settings = await this.firebaseMessaging.requestPermission({
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
+      announcement: false,
+      carPlay: false,
+      criticalAlert: false,
+    });
+    ClixLogger.info('Notification permission status:', settings);
+    await this.storageService.set(
+      'notification_permission_status',
+      settings.toString()
+    );
+    return settings;
+  }
+
+  private setupTokenRefreshListener(): void {
+    this.unsubscribeTokenRefresh = this.firebaseMessaging.onTokenRefresh(
+      async (token) => {
+        try {
+          ClixLogger.info('FCM token refreshed');
+          this.currentToken = token;
+          await this.saveAndRegisterToken(token);
+        } catch (error) {
+          ClixLogger.error('Failed to handle token refresh', error);
+        }
+      }
+    );
+  }
+
+  private async onForegroundMessage(
     remoteMessage: FirebaseMessagingTypes.RemoteMessage
   ): Promise<void> {
     try {
-      const clixPayload = this.parseClixPayload(remoteMessage.data || {});
-      if (!clixPayload) {
-        ClixLogger.warn('No Clix payload found in foreground message');
-        return;
-      }
-
-      await this.trackPushEvent(
-        PushNotificationEvent.RECEIVED,
-        this.convertToRecord(clixPayload)
-      );
-
-      if (!remoteMessage.notification) {
-        await this.showLocalNotification(clixPayload);
+      ClixLogger.info('Received foreground message:', remoteMessage.messageId);
+      ClixLogger.debug('Message data:', remoteMessage.data);
+      const clixPayload = this.parseClixPayload(remoteMessage.data ?? {});
+      if (clixPayload) {
+        ClixLogger.debug('Parsed Clix payload:', clixPayload);
+        await this.handlePushReceived(remoteMessage.data ?? {});
+        await this.showForegroundNotification(remoteMessage, clixPayload);
+      } else {
+        ClixLogger.warn('No Clix payload found in message');
       }
     } catch (error) {
-      ClixLogger.error('Failed to handle foreground push notification', error);
+      ClixLogger.error('Failed to handle foreground message', error);
     }
   }
 
-  private onForegroundMessage = async (
-    remoteMessage: FirebaseMessagingTypes.RemoteMessage
-  ): Promise<void> => {
-    await this.handleForegroundPushNotification(remoteMessage);
-  };
-
-  public async handleNotificationTap(data: Record<string, any>): Promise<void> {
+  private async handlePushReceived(data: Record<string, any>): Promise<void> {
     try {
       const clixPayload = this.parseClixPayload(data);
       if (clixPayload) {
-        await this.handlePushTapped(data);
+        await this.trackPushEvent('PUSH_NOTIFICATION_RECEIVED', clixPayload);
       }
-
-      await this.handleUrlNavigation(data);
+      ClixLogger.info('Push notification received and processed');
     } catch (error) {
-      ClixLogger.error('Failed to handle notification tap', error);
+      ClixLogger.error('Failed to handle push received', error);
     }
   }
 
-  private async handlePushTapped(userInfo: Record<string, any>): Promise<void> {
+  private async handlePushTapped(data: Record<string, any>): Promise<void> {
     try {
-      const clixPayload = this.parseClixPayload(userInfo);
+      const clixPayload = this.parseClixPayload(data);
       if (clixPayload) {
-        await this.trackPushEvent(
-          'PUSH_NOTIFICATION_TAPPED',
-          this.convertToRecord(clixPayload)
-        );
-        ClixLogger.debug('Push notification tapped event tracked', {
-          messageId: clixPayload.messageId,
-        });
-      } else {
-        ClixLogger.debug('No Clix payload found for push tap');
+        await this.trackPushEvent('PUSH_NOTIFICATION_TAPPED', clixPayload);
       }
+      await this.handleUrlNavigation(data);
+      ClixLogger.info('Push notification tapped and processed');
     } catch (error) {
       ClixLogger.error('Failed to handle push tapped', error);
     }
   }
 
-  public trackPushEvent(
-    eventType: string,
-    clixPayload: Record<string, any>
+  private async handleNotificationTap(
+    data: Record<string, any>
   ): Promise<void> {
-    return this._trackPushEvent(eventType, clixPayload);
-  }
-
-  private async _trackPushEvent(
-    eventType: string,
-    clixPayload: Record<string, any>
-  ): Promise<void> {
-    const properties = this.extractTrackingProperties(clixPayload);
-    const messageId = clixPayload.message_id as string;
-    await this.eventService?.trackEvent(eventType, properties, messageId);
-    ClixLogger.info(`${eventType} tracked: ${messageId}`);
-  }
-
-  private extractTrackingProperties(
-    clixPayload?: Record<string, any>
-  ): Record<string, any> {
-    if (!clixPayload) return {};
-
-    const properties: Record<string, any> = {};
-    const FIELD_MAPPING = {
-      message_id: 'messageId',
-      campaign_id: 'campaignId',
-      tracking_id: 'trackingId',
-    } as const;
-
-    Object.entries(FIELD_MAPPING).forEach(([key, value]) => {
-      const val = clixPayload[key] as string;
-      if (val) {
-        properties[value] = val;
-      }
-    });
-
-    return properties;
+    try {
+      await this.handlePushTapped(data);
+    } catch (error) {
+      ClixLogger.error('Failed to handle notification tap', error);
+    }
   }
 
   private async handleUrlNavigation(data: Record<string, any>): Promise<void> {
     try {
       let url: string | undefined;
-
-      // Try to get URL from Clix payload first
       const clixPayload = this.parseClixPayload(data);
-      if (clixPayload && clixPayload.landingUrl) {
+      if (clixPayload) {
         url = clixPayload.landingUrl;
       }
-
-      // Fallback to direct data properties
       url =
-        url ||
-        (data.landing_url as string) ||
-        (data.url as string) ||
-        (data.link as string) ||
-        (data.click_action as string) ||
-        (data.deep_link as string);
-
-      if (url && url.trim()) {
-        ClixLogger.info(`Opening URL from notification: ${url}`);
-
+        url || data.landing_url || data.url || data.link || data.click_action;
+      if (url) {
+        ClixLogger.info('Opening URL from notification:', url);
         try {
-          const canOpen = await Linking.canOpenURL(url);
-          ClixLogger.debug(`Can launch URL: ${canOpen}`);
-
-          if (canOpen) {
+          const supported = await Linking.canOpenURL(url);
+          ClixLogger.debug('Can open URL:', supported);
+          if (supported) {
             await Linking.openURL(url);
-            ClixLogger.info(`URL opened successfully: ${url}`);
+            ClixLogger.info('URL opened successfully:', url);
           } else {
-            ClixLogger.warn(`Cannot launch URL: ${url}`);
-            try {
-              await Linking.openURL(url);
-              ClixLogger.info(`URL opened with platform default mode: ${url}`);
-            } catch (e) {
-              ClixLogger.error(
-                'Failed to launch URL with platform default mode',
-                e
-              );
-            }
+            ClixLogger.warn('Cannot open URL:', url);
+            await Linking.openURL(url);
           }
         } catch (error) {
-          ClixLogger.error(`Error parsing or launching URL: ${url}`, error);
+          ClixLogger.error('Error opening URL:', error);
         }
-      } else {
-        ClixLogger.debug('No URL found in notification data');
       }
     } catch (error) {
       ClixLogger.error('Failed to handle URL navigation', error);
     }
   }
 
-  private onMessageOpenedApp = async (
-    remoteMessage: FirebaseMessagingTypes.RemoteMessage
-  ): Promise<void> => {
+  async getCurrentToken(): Promise<string | null> {
     try {
-      ClixLogger.info(
-        `App opened from notification: ${remoteMessage.messageId}`
-      );
-      await this.handleNotificationTap(remoteMessage.data || {});
+      this.currentToken = await this.getOrFetchToken();
+      return this.currentToken;
     } catch (error) {
-      ClixLogger.error('Failed to handle message opened app', error);
-    }
-  };
-
-  private async handleInitialMessage(): Promise<void> {
-    try {
-      const initialMessage = await messaging().getInitialNotification();
-      if (initialMessage) {
-        ClixLogger.info(
-          `App launched from notification: ${initialMessage.messageId}`
-        );
-        await this.handleNotificationTap(initialMessage.data || {});
-      }
-    } catch (error) {
-      ClixLogger.error('Failed to handle initial message', error);
-    }
-  }
-
-  private setupTokenRefreshListener(): void {
-    try {
-      this.unsubscribeOnTokenRefresh = messaging().onTokenRefresh(
-        this.onTokenRefresh
-      );
-      ClixLogger.debug('Token refresh listener setup completed');
-    } catch (error) {
-      ClixLogger.error('Failed to setup token refresh listener', error);
-    }
-  }
-
-  private onTokenRefresh = async (token: string): Promise<void> => {
-    try {
-      ClixLogger.info('FCM token refreshed');
-      this.currentToken = token;
-      await this.saveAndRegisterToken(token);
-    } catch (error) {
-      ClixLogger.error('Failed to handle token refresh', error);
-    }
-  };
-
-  async getCurrentToken(): Promise<string | undefined> {
-    try {
-      const token = await this.getOrFetchToken();
-      if (token) {
-        ClixLogger.debug('Current token retrieved successfully', {
-          tokenLength: token.length,
-        });
-      } else {
-        ClixLogger.warn('No current token available');
-      }
-      return token;
-    } catch (error) {
-      ClixLogger.error('Failed to get current token', error);
-      return undefined;
+      ClixLogger.error('Failed to get FCM token', error);
+      return null;
     }
   }
 
   private async getAndUpdateToken(): Promise<void> {
     try {
-      const token = await this.getOrFetchToken();
+      const token = await this.getCurrentToken();
       if (token) {
-        this.currentToken = token;
-        await this.saveAndRegisterToken(token);
+        await this.registerTokenWithServer(token);
       }
     } catch (error) {
-      ClixLogger.error('Failed to get and update token', error);
+      ClixLogger.error('Failed to update token', error);
     }
   }
 
-  async setNotificationPreferences(
-    enabled: boolean,
-    categories?: string[]
-  ): Promise<void> {
-    if (!this.storageService) {
-      throw new Error('Storage service not initialized');
+  private async getOrFetchToken(): Promise<string | null> {
+    if (this.tokenService) {
+      const savedToken = await this.tokenService.getCurrentToken();
+      if (savedToken) return savedToken;
     }
+    const token = await this.firebaseMessaging.getToken();
+    if (token) {
+      ClixLogger.info('Got FCM token:', token.substring(0, 20) + '...');
+      await this.tokenService?.saveToken(token);
+    }
+    return token;
+  }
 
+  private async saveAndRegisterToken(token: string): Promise<void> {
+    if (this.tokenService) {
+      await this.tokenService.saveToken(token);
+      ClixLogger.info('New FCM token saved via TokenService');
+    }
+    await this.registerTokenWithServer(token);
+  }
+
+  private async registerTokenWithServer(token: string): Promise<void> {
+    if (this.deviceService) {
+      await this.deviceService.upsertToken(token);
+      ClixLogger.info('FCM token registered with server');
+    }
+  }
+
+  private parseClixPayload(
+    userInfo: Record<string, any>
+  ): ClixPushNotificationPayload | null {
     try {
-      const settings = {
-        enabled,
-        categories: categories || [],
-        updatedAt: Date.now(),
-        version: '1.0',
-      };
-
-      await this.storageService.set(
-        NotificationService.STORAGE_KEYS.NOTIFICATION_SETTINGS,
-        settings
-      );
-
-      // Update permission status if needed
-      if (enabled) {
-        const permissionStatus = await this.requestPermissions();
-        if (!permissionStatus.granted) {
-          ClixLogger.warn(
-            'Notification preferences enabled but permission not granted'
-          );
+      // clix 오브젝트 또는 snake_case를 camelCase로 변환
+      let payload: any = userInfo;
+      if (userInfo.clix) {
+        if (typeof userInfo.clix === 'object') {
+          payload = userInfo.clix;
+        } else if (typeof userInfo.clix === 'string') {
+          payload = JSON.parse(userInfo.clix);
         }
       }
+      // snake_case → camelCase 변환
+      const toCamel = (s: string) =>
+        s.replace(/_([a-z])/g, (g) => (g[1] ?? '').toUpperCase());
+      const result: any = {};
+      if (!payload) return null;
+      for (const key in payload) {
+        result[toCamel(key)] = payload[key];
+      }
+      if (!result.messageId) return null;
+      return new ClixPushNotificationPayload(result);
+    } catch (error) {
+      ClixLogger.error('Failed to parse Clix payload', error);
+      return null;
+    }
+  }
 
-      ClixLogger.info('Notification preferences updated successfully', {
-        enabled,
-        categoriesCount: categories?.length || 0,
+  getMessageId(userInfo: Record<string, any>): string | undefined {
+    const clixPayload = this.parseClixPayload(userInfo);
+    return clixPayload?.messageId;
+  }
+
+  private async showForegroundNotification(
+    remoteMessage: FirebaseMessagingTypes.RemoteMessage,
+    clixPayload: ClixPushNotificationPayload
+  ): Promise<void> {
+    try {
+      const notificationContent = this.extractNotificationContent(
+        remoteMessage.notification,
+        clixPayload
+      );
+      ClixLogger.debug(
+        `Showing foreground notification: ${notificationContent.title} - ${notificationContent.body}`
+      );
+      const notificationConfig: NotifeeNotification = {
+        id: remoteMessage.messageId || Date.now().toString(),
+        title: notificationContent.title,
+        body: notificationContent.body,
+        data: remoteMessage.data ?? {},
+        android: {
+          channelId: NotificationService.CHANNEL_ID,
+          pressAction: {
+            id: 'default',
+          },
+        },
+      };
+      if (notificationContent.imageUrl) {
+        if (Platform.OS === 'ios') {
+          notificationConfig.ios = {
+            attachments: [{ url: notificationContent.imageUrl }],
+          };
+        } else {
+          notificationConfig.android!.style = {
+            type: AndroidStyle.BIGPICTURE,
+            picture: notificationContent.imageUrl,
+          };
+        }
+      }
+      await notifee.displayNotification(notificationConfig);
+      ClixLogger.info('Foreground notification displayed successfully');
+    } catch (error) {
+      ClixLogger.error('Failed to show foreground notification', error);
+    }
+  }
+
+  private async showBackgroundNotification(
+    remoteMessage: FirebaseMessagingTypes.RemoteMessage,
+    clixPayload: ClixPushNotificationPayload
+  ): Promise<void> {
+    try {
+      const notificationContent = this.extractNotificationContent(
+        null,
+        clixPayload
+      );
+      await notifee.displayNotification({
+        id: remoteMessage.messageId || Date.now().toString(),
+        title: notificationContent.title,
+        body: notificationContent.body,
+        data: remoteMessage.data ?? {},
+        android: {
+          channelId: NotificationService.CHANNEL_ID,
+          pressAction: {
+            id: 'default',
+          },
+          style: notificationContent.imageUrl
+            ? {
+                type: AndroidStyle.BIGPICTURE,
+                picture: notificationContent.imageUrl,
+              }
+            : undefined,
+        },
+        ios: notificationContent.imageUrl
+          ? {
+              attachments: [{ url: notificationContent.imageUrl }],
+            }
+          : undefined,
       });
+      ClixLogger.info(
+        'Background notification shown:',
+        notificationContent.title
+      );
+    } catch (error) {
+      ClixLogger.error('Failed to show background notification', error);
+    }
+  }
+
+  private extractNotificationContent(
+    fcmNotification: FirebaseMessagingTypes.Notification | null | undefined,
+    clixPayload: ClixPushNotificationPayload
+  ): NotificationContent {
+    const title =
+      fcmNotification?.title ||
+      clixPayload.customProperties?.title ||
+      'New Message';
+    const body =
+      fcmNotification?.body || clixPayload.customProperties?.body || '';
+    const imageUrl = clixPayload.imageUrl;
+    return {
+      title,
+      body,
+      imageUrl,
+    };
+  }
+
+  private async trackPushEvent(
+    eventType: string,
+    clixPayload: ClixPushNotificationPayload
+  ): Promise<void> {
+    const properties = this.extractTrackingProperties(clixPayload);
+    const messageId = clixPayload.messageId;
+    await this.eventService.trackEvent(eventType, properties, messageId);
+    ClixLogger.info(`${eventType} tracked:`, messageId);
+  }
+
+  private extractTrackingProperties(
+    clixPayload: ClixPushNotificationPayload
+  ): Record<string, any> {
+    const properties: Record<string, any> = {};
+    if (clixPayload.messageId) properties.messageId = clixPayload.messageId;
+    if (clixPayload.campaignId) properties.campaignId = clixPayload.campaignId;
+    if (clixPayload.trackingId) properties.trackingId = clixPayload.trackingId;
+    return properties;
+  }
+
+  private async trackEventInBackground(
+    clixPayload: ClixPushNotificationPayload
+  ): Promise<void> {
+    const messageId = clixPayload.messageId;
+    if (!messageId) {
+      ClixLogger.warn('No messageId found in payload, skipping event tracking');
+      return;
+    }
+    try {
+      const storageService = new StorageService();
+      const configData = await storageService.get<Record<string, any>>(
+        'clix_config'
+      );
+      if (!configData) {
+        ClixLogger.error('No Clix config found in storage');
+        return;
+      }
+      let deviceId = await storageService.get<string>('clix_device_id');
+      if (!deviceId) {
+        ClixLogger.warn(
+          'No device ID found in storage, generating new device ID'
+        );
+        deviceId = uuidv4();
+        await storageService.set('clix_device_id', deviceId);
+      }
+      const config = configData as ClixConfig;
+      const apiClient = new ClixAPIClient(config);
+      const deviceAPIService = new DeviceAPIService(apiClient);
+      const eventAPIService = new EventAPIService(apiClient);
+      const tokenService = new TokenService(storageService);
+      const deviceService = new DeviceService(
+        storageService,
+        tokenService,
+        deviceAPIService
+      );
+      const eventService = new EventService(eventAPIService, deviceService);
+      const properties = this.extractTrackingProperties(clixPayload);
+      await eventService.trackEvent(
+        'PUSH_NOTIFICATION_RECEIVED',
+        properties,
+        messageId
+      );
+      ClixLogger.info('PUSH_NOTIFICATION_RECEIVED event tracked in background');
+    } catch (error) {
+      ClixLogger.error('Error tracking event in background', error);
+    }
+  }
+
+  async requestNotificationPermission(): Promise<boolean> {
+    try {
+      ClixLogger.info('Requesting notification permission');
+      const settings = await this.requestPermission();
+      const granted = settings === messaging.AuthorizationStatus.AUTHORIZED;
+      ClixLogger.info('Notification permission granted:', granted);
+      return granted;
+    } catch (error) {
+      ClixLogger.error('Failed to request notification permission', error);
+      return false;
+    }
+  }
+
+  async setNotificationPreferences(preferences: {
+    enabled: boolean;
+    categories?: string[];
+  }): Promise<void> {
+    try {
+      const settings = {
+        enabled: preferences.enabled,
+        categories: preferences.categories || [],
+        timestamp: Date.now(),
+      };
+      await this.storageService.set('clix_notification_settings', settings);
+      ClixLogger.info('Notification preferences saved:', settings.enabled);
     } catch (error) {
       ClixLogger.error('Failed to set notification preferences', error);
-      throw error;
+    }
+  }
+
+  async setBadgeCount(count: number): Promise<void> {
+    if (Platform.OS === 'ios') {
+      try {
+        await notifee.setBadgeCount(count);
+        ClixLogger.info('Badge count set to:', count);
+      } catch (error) {
+        ClixLogger.error('Failed to set badge count', error);
+      }
     }
   }
 
   async reset(): Promise<void> {
     try {
-      this.unsubscribeOnTokenRefresh?.();
-      this.unsubscribeOnMessage?.();
-      this.unsubscribeOnMessageOpenedApp?.();
-
-      this.isInitialized = false;
-      this.currentToken = undefined;
-
-      if (this.storageService) {
-        await this.storageService.remove(
-          NotificationService.STORAGE_KEYS.LAST_NOTIFICATION
-        );
-        await this.storageService.remove(
-          NotificationService.STORAGE_KEYS.LAST_BACKGROUND_NOTIFICATION
-        );
-        await this.storageService.remove(
-          NotificationService.STORAGE_KEYS.NOTIFICATION_PERMISSION_STATUS
-        );
+      await this.storageService.remove('clix_notification_settings');
+      await this.storageService.remove('clix_last_notification');
+      if (this.tokenService) {
+        await this.tokenService.reset();
       }
-
-      ClixLogger.info('Notification service reset completed successfully');
+      this.currentToken = null;
+      ClixLogger.info('Notification data reset completed');
     } catch (error) {
-      ClixLogger.error('Failed to reset notification service', error);
-      throw error;
+      ClixLogger.error('Failed to reset notification data', error);
     }
+  }
+
+  cleanup(): void {
+    this.unsubscribeForegroundMessage?.();
+    this.unsubscribeNotificationOpened?.();
+    this.unsubscribeTokenRefresh?.();
+    this.isInitialized = false;
+    ClixLogger.info('Notification service cleaned up');
   }
 
   get initialized(): boolean {
     return this.isInitialized;
   }
 
-  get token(): string | undefined {
+  get token(): string | null {
     return this.currentToken;
-  }
-
-  private async getOrFetchToken(): Promise<string | undefined> {
-    try {
-      if (this.currentToken) {
-        return this.currentToken;
-      }
-
-      const token = await messaging().getToken();
-      if (token) {
-        this.currentToken = token;
-        return token;
-      }
-
-      return undefined;
-    } catch (error) {
-      ClixLogger.error('Failed to get or fetch token', error);
-      return undefined;
-    }
-  }
-
-  private async saveAndRegisterToken(token: string): Promise<void> {
-    try {
-      if (!this.tokenService) {
-        ClixLogger.warn('Token service not initialized');
-        return;
-      }
-
-      await this.tokenService.saveToken(token);
-      await this.registerTokenWithServer(token);
-
-      ClixLogger.info('Token saved and registered successfully', {
-        tokenLength: token.length,
-      });
-    } catch (error) {
-      ClixLogger.error('Failed to save and register token', error);
-    }
-  }
-
-  private async registerTokenWithServer(token: string): Promise<void> {
-    try {
-      if (!this.deviceService) {
-        ClixLogger.warn('Device service not initialized');
-        return;
-      }
-
-      await this.deviceService.upsertToken(token);
-
-      ClixLogger.info('Token registered with server successfully', {
-        tokenLength: token.length,
-      });
-    } catch (error) {
-      ClixLogger.error('Failed to register token with server', error);
-    }
-  }
-
-  private async storeBackgroundNotificationData(
-    storageService: StorageService,
-    message: FirebaseMessagingTypes.RemoteMessage,
-    clixPayload?: ClixPushNotificationPayload
-  ): Promise<void> {
-    try {
-      const notificationData = {
-        messageId: message.messageId,
-        data: message.data,
-        clixPayload: clixPayload
-          ? this.displayService?.convertToRecord(clixPayload)
-          : undefined,
-        timestamp: Date.now(),
-        receivedAt: new Date().toISOString(),
-      };
-
-      await storageService.set(
-        NotificationService.STORAGE_KEYS.LAST_BACKGROUND_NOTIFICATION,
-        notificationData
-      );
-
-      ClixLogger.debug('Background notification data stored successfully', {
-        messageId: message.messageId,
-        hasClixPayload: !!clixPayload,
-      });
-    } catch (error) {
-      ClixLogger.error('Failed to store background notification data', error);
-    }
   }
 }
