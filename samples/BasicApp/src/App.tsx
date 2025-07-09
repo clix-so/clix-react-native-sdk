@@ -5,8 +5,7 @@
  * @format
  */
 
-import Clix, { ClixLogLevel } from '@clix/react-native-sdk';
-import messaging from '@react-native-firebase/messaging';
+import Clix from '@clix/react-native-sdk';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -31,9 +30,6 @@ function App() {
   const [propertyValue, setPropertyValue] = useState('');
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [pushToken, setPushToken] = useState<string | null>(null);
-  const [notificationPermission, setNotificationPermission] =
-    useState<string>('not-determined');
-  const [lastNotification, setLastNotification] = useState<any>(null);
 
   const projectId = ClixInfo.projectId;
   const apiKey = ClixInfo.apiKey;
@@ -42,35 +38,36 @@ function App() {
     const initializeSDK = async () => {
       try {
         // Use a fallback log level if ClixLogLevel.Debug is not available
-        const logLevel = ClixLogLevel?.DEBUG ?? 4; // 4 is Debug level
+        try {
+          const currentDeviceId = await Clix.getDeviceId();
+          const currentPushToken = await Clix.getPushToken();
 
-        console.info('ClixLogLevel available:', !!ClixLogLevel);
-        console.info('ClixLogLevel.Debug value:', ClixLogLevel?.DEBUG);
+          // Update state with null if values are undefined
+          setDeviceId(currentDeviceId || null);
+          setPushToken(currentPushToken || null);
+        } catch (deviceError) {
+          console.warn(
+            'Failed to get device info immediately after init:',
+            deviceError
+          );
+          // Set placeholders and try again later
+          setDeviceId('Loading...');
+          setPushToken('Loading...');
 
-        // Initialize Clix SDK without push notification handlers
-        await Clix.initialize({
-          projectId: ClixInfo.projectId,
-          apiKey: ClixInfo.apiKey,
-          logLevel: logLevel,
-        });
-
-        // Get device information after initialization
-        const currentDeviceId = await Clix.getDeviceId();
-        const currentPushToken = await Clix.getPushToken();
-
-        // Update state with null if values are undefined
-        setDeviceId(currentDeviceId || null);
-        setPushToken(currentPushToken || null);
-        
-        // Firebase handles notification permissions now
-        const authStatus = await messaging().requestPermission();
-        const enabled =
-          authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-          authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-        
-        setNotificationPermission(
-          enabled ? 'authorized' : 'denied'
-        );
+          // Retry after a delay
+          setTimeout(async () => {
+            try {
+              const currentDeviceId = await Clix.getDeviceId();
+              const currentPushToken = await Clix.getPushToken();
+              setDeviceId(currentDeviceId || null);
+              setPushToken(currentPushToken || null);
+            } catch (retryError) {
+              console.error('Failed to get device info on retry:', retryError);
+              setDeviceId('Error loading');
+              setPushToken('Error loading');
+            }
+          }, 1000);
+        }
       } catch (error) {
         console.error('Failed to initialize Clix SDK:', error);
         Alert.alert('Error', `Failed to initialize Clix SDK: ${error}`);
@@ -79,41 +76,17 @@ function App() {
 
     initializeSDK();
 
-    // Set up Firebase messaging listeners
-    const unsubscribeOnMessage = messaging().onMessage(
-      async (remoteMessage) => {
-        console.info('FCM Message received in foreground:', remoteMessage);
-        Alert.alert(
-          'New Notification',
-          remoteMessage.notification?.body || 'You have a new message'
-        );
-        
-        // Store last notification information
-        setLastNotification({
-          type: 'received',
-          data: remoteMessage.data,
-          timestamp: new Date().toISOString(),
-        });
-      }
-    );
-    
-    // Listen for notification open events
-    const unsubscribeOnNotificationOpened = messaging().onNotificationOpenedApp(
-      (remoteMessage) => {
-        console.info('Notification opened the app:', remoteMessage);
-        
-        // Store notification information for display
-        setLastNotification({
-          type: 'tapped',
-          data: remoteMessage.data,
-          timestamp: new Date().toISOString(),
-        });
-      }
-    );
+    // Note: Clix SDK handles all notification logic internally
+    // No need to set up listeners as the SDK manages everything
+    // The SDK will automatically handle:
+    // - Foreground message display
+    // - Background message handling
+    // - Notification tap handling
+    // - Token management
+    // - Permission management
 
     return () => {
-      unsubscribeOnMessage();
-      unsubscribeOnNotificationOpened();
+      // Cleanup handled by Clix SDK
     };
   }, []);
 
@@ -150,52 +123,6 @@ function App() {
     }
   };
 
-  const handleRequestPermission = async () => {
-    try {
-      const authStatus = await messaging().requestPermission();
-      const enabled =
-        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-      
-      setNotificationPermission(enabled ? 'authorized' : 'denied');
-
-      if (enabled) {
-        Alert.alert('Success', 'Notification permission granted');
-        // Update push token after permission granted
-        const token = await Clix.getPushToken();
-        setPushToken(token || null);
-      } else {
-        Alert.alert(
-          'Permission Denied',
-          'Please enable notifications in settings'
-        );
-      }
-    } catch (error) {
-      console.error('Failed to request permission:', error);
-      Alert.alert('Error', 'Failed to request notification permission');
-    }
-  };
-
-  const handleSubscribeToTopic = async () => {
-    try {
-      await messaging().subscribeToTopic('test-topic');
-      Alert.alert('Success', 'Subscribed to test-topic');
-    } catch (error) {
-      console.error('Failed to subscribe to topic:', error);
-      Alert.alert('Error', 'Failed to subscribe to topic');
-    }
-  };
-
-  const handleUnsubscribeFromTopic = async () => {
-    try {
-      await messaging().unsubscribeFromTopic('test-topic');
-      Alert.alert('Success', 'Unsubscribed from test-topic');
-    } catch (error) {
-      console.error('Failed to unsubscribe from topic:', error);
-      Alert.alert('Error', 'Failed to unsubscribe from topic');
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#000" />
@@ -204,7 +131,6 @@ function App() {
         style={styles.scrollView}
       >
         <View style={styles.content}>
-          {/* Logo */}
           <View style={styles.logoContainer}>
             <Image
               source={require('./assets/logo.png')}
@@ -213,7 +139,6 @@ function App() {
             />
           </View>
 
-          {/* Project Information */}
           <View style={styles.infoContainer}>
             <Text style={styles.label}>Project ID:</Text>
             <Text style={styles.infoText}>{projectId}</Text>
@@ -234,23 +159,6 @@ function App() {
             <Text style={styles.infoText}>{pushToken || 'Not available'}</Text>
           </View>
 
-          <View style={styles.infoContainer}>
-            <Text style={styles.label}>Notification Permission:</Text>
-            <Text style={styles.infoText}>{notificationPermission}</Text>
-          </View>
-
-          {lastNotification && (
-            <View style={styles.infoContainer}>
-              <Text style={styles.label}>Last Notification:</Text>
-              <Text style={styles.infoText}>
-                Type: {lastNotification.type}
-                {`\n`}Time: {lastNotification.timestamp}
-                {`\n`}Data: {JSON.stringify(lastNotification.data, null, 2)}
-              </Text>
-            </View>
-          )}
-
-          {/* User ID Section */}
           <View style={styles.inputSection}>
             <Text style={styles.label}>User ID</Text>
             <View style={styles.inputRow}>
@@ -270,7 +178,6 @@ function App() {
             </View>
           </View>
 
-          {/* User Property Section */}
           <View style={styles.inputSection}>
             <Text style={styles.label}>User Property Key</Text>
             <TextInput
@@ -299,36 +206,6 @@ function App() {
           >
             <Text style={styles.buttonText}>Set User Property</Text>
           </TouchableOpacity>
-
-          {/* Notification Actions */}
-          <View style={styles.notificationSection}>
-            <Text style={[styles.label, styles.sectionTitle]}>
-              Push Notifications
-            </Text>
-
-            {notificationPermission !== 'authorized' && (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleRequestPermission}
-              >
-                <Text style={styles.buttonText}>Request Permission</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleSubscribeToTopic}
-            >
-              <Text style={styles.buttonText}>Subscribe to Test Topic</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleUnsubscribeFromTopic}
-            >
-              <Text style={styles.buttonText}>Unsubscribe from Test Topic</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </ScrollView>
     </SafeAreaView>

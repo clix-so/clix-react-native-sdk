@@ -1,35 +1,39 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { MMKV } from 'react-native-mmkv';
 import { ClixLogger } from '../utils/logging/ClixLogger';
 
 export class StorageService {
-  private static instance: StorageService;
+  private storage: MMKV;
 
-  private constructor() {}
-
-  public static getInstance(): StorageService {
-    if (!StorageService.instance) {
-      StorageService.instance = new StorageService();
-    }
-    return StorageService.instance;
+  constructor() {
+    this.storage = new MMKV({
+      id: 'clix-storage',
+      encryptionKey: undefined, // Add encryption if needed
+    });
   }
 
   async set<T>(key: string, value: T): Promise<void> {
-    try {
-      if (value === undefined) {
-        await AsyncStorage.removeItem(key);
-        return;
+    if (value === undefined) {
+      try {
+        this.storage.delete(key);
+      } catch (error) {
+        ClixLogger.error(`Failed to remove value for key: ${key}`, error);
       }
+      return;
+    }
+
+    try {
       const encoded = JSON.stringify(value);
-      await AsyncStorage.setItem(key, encoded);
+      this.storage.set(key, encoded);
     } catch (error) {
       ClixLogger.error(`Failed to set value for key: ${key}`, error);
-      throw error;
+      // Don't throw storage errors to prevent initialization failure
+      return;
     }
   }
 
   async get<T>(key: string): Promise<T | undefined> {
     try {
-      const data = await AsyncStorage.getItem(key);
+      const data = this.storage.getString(key);
       if (data === null || data === undefined) return undefined;
       try {
         const decoded = JSON.parse(data);
@@ -39,27 +43,29 @@ export class StorageService {
         ClixLogger.debug(
           `Found legacy string value for key: ${key}, migrating to JSON format`
         );
-        await this.set(key, data as any);
+        await this.set(key, data);
         return data as T;
       }
     } catch (error) {
       ClixLogger.error(`Failed to get value for key: ${key}`, error);
-      throw error;
+      // Return undefined instead of throwing to prevent initialization failure
+      return undefined;
     }
   }
 
   async remove(key: string): Promise<void> {
     try {
-      await AsyncStorage.removeItem(key);
+      this.storage.delete(key);
     } catch (error) {
       ClixLogger.error(`Failed to remove key: ${key}`, error);
-      throw error;
+      // Don't throw to prevent initialization failure
+      return;
     }
   }
 
   async clear(): Promise<void> {
     try {
-      await AsyncStorage.clear();
+      this.storage.clearAll();
     } catch (error) {
       ClixLogger.error('Failed to clear storage', error);
       throw error;
@@ -68,7 +74,7 @@ export class StorageService {
 
   async getAllKeys(): Promise<string[]> {
     try {
-      const keys = await AsyncStorage.getAllKeys();
+      const keys = this.storage.getAllKeys();
       return Array.from(keys);
     } catch (error) {
       ClixLogger.error('Failed to get all keys', error);

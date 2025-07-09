@@ -1,11 +1,12 @@
+import messaging from '@react-native-firebase/messaging';
 import { Platform } from 'react-native';
 import DeviceInfo from 'react-native-device-info';
-import { v4 as uuidv4 } from 'uuid';
 import { ClixVersion } from '../core/ClixVersion';
 import { ClixDevice } from '../models/ClixDevice';
 import { ClixUserProperty } from '../models/ClixUserProperty';
 import { ClixError } from '../utils/ClixError';
 import { ClixLogger } from '../utils/logging/ClixLogger';
+import { UUID } from '../utils/UUID';
 import { DeviceAPIService } from './DeviceAPIService';
 import { StorageService } from './StorageService';
 import { TokenService } from './TokenService';
@@ -27,7 +28,7 @@ export class DeviceService {
       return existingId;
     }
 
-    const newId = uuidv4();
+    const newId = UUID.generate();
     await this.storageService.set(DeviceService.DEVICE_ID_KEY, newId);
     return newId;
   }
@@ -111,10 +112,52 @@ export class DeviceService {
       ClixLogger.info(`Token upserted: ${tokenType}`);
     } catch (error) {
       ClixLogger.error('Failed to upsert token', error);
+
+      // Don't throw for token upsert failures during initialization
+      // This allows the SDK to continue initializing even if token registration fails
+      if (
+        error instanceof Error &&
+        error.message.includes('crypto.getRandomValues')
+      ) {
+        ClixLogger.warn(
+          'Token upsert failed due to crypto polyfill issue, will retry later'
+        );
+        return;
+      }
+
       throw ClixError.unknownError({
         reason: `Failed to upsert token: ${error}`,
         cause: error,
       });
+    }
+  }
+
+  private async getPushPermissionStatus(): Promise<boolean> {
+    try {
+      // First check stored permission status
+      const storedStatus = await this.storageService.get<string>(
+        'notification_permission_status'
+      );
+      if (storedStatus === 'authorized' || storedStatus === 'provisional') {
+        return true;
+      }
+
+      // If no stored status, check current Firebase messaging permission
+      const authStatus = await messaging().hasPermission();
+      const isGranted =
+        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+      ClixLogger.debug(
+        `Push permission status: ${isGranted ? 'granted' : 'denied'}`
+      );
+      return isGranted;
+    } catch (error) {
+      ClixLogger.warn(
+        'Failed to get push permission status, defaulting to false',
+        error
+      );
+      return false;
     }
   }
 
@@ -131,7 +174,7 @@ export class DeviceService {
     const localeLanguage = locale.split('-')[0] || 'en';
     const localeRegion = locale.split('-')[1] || 'US';
     let adId: string | undefined;
-    const isPushPermissionGranted = false;
+    const isPushPermissionGranted = await this.getPushPermissionStatus();
     const sdkVersion = await ClixVersion.getVersion();
 
     return new ClixDevice({

@@ -23,20 +23,20 @@ export class ClixLogger {
     }
 
     const timestamp = new Date().toISOString();
-    let logMessage = `[Clix][${timestamp}] ${message}`;
+    const messages = [`[Clix][${timestamp}] ${message}`, error].filter(Boolean);
 
     switch (level) {
       case ClixLogLevel.DEBUG:
-        console.debug(logMessage, error);
+        console.debug(...messages);
         break;
       case ClixLogLevel.INFO:
-        console.info(logMessage, error);
+        console.info(...messages);
         break;
       case ClixLogLevel.WARN:
-        console.warn(logMessage, error);
+        console.warn(...messages);
         break;
       case ClixLogLevel.ERROR:
-        console.error(logMessage, error);
+        console.error(...messages);
         break;
       case ClixLogLevel.NONE:
         return;

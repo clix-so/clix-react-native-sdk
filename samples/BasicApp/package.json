@@ -16,12 +16,14 @@
   },
   "dependencies": {
     "@clix/react-native-sdk": "file:../..",
-    "@react-native-async-storage/async-storage": "1.24.0",
     "@react-native-firebase/app": "19.3.0",
     "@react-native-firebase/messaging": "19.3.0",
+    "@notifee/react-native": "9.1.8",
     "react": "18.3.1",
     "react-native": "0.76.9",
     "react-native-device-info": "13.2.0",
+    "react-native-get-random-values": "1.11.0",
+    "react-native-mmkv": "2.12.2",
     "uuid": "11.1.0"
   },
   "devDependencies": {

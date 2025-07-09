@@ -9,43 +9,11 @@ import { TokenService } from '../services/TokenService';
 import { ClixError } from '../utils/ClixError';
 import { ClixLogLevel, ClixLogger } from '../utils/logging/ClixLogger';
 import type { ClixConfig } from './ClixConfig';
-
-class InitCoordinator {
-  private static readonly TIMEOUT_MS = 5000;
-  private promise: Promise<void>;
-  private resolve!: () => void;
-  private reject!: (error: any) => void;
-  private timeoutId: ReturnType<typeof setTimeout>;
-
-  constructor(timeoutMs: number = InitCoordinator.TIMEOUT_MS) {
-    this.promise = new Promise<void>((res, rej) => {
-      this.resolve = res;
-      this.reject = rej;
-    });
-    this.timeoutId = setTimeout(() => {
-      this.reject(ClixError.notInitialized());
-    }, timeoutMs);
-  }
-
-  async waitForInitialization(): Promise<void> {
-    return this.promise;
-  }
-
-  completeInitialization(): void {
-    clearTimeout(this.timeoutId);
-    this.resolve();
-  }
-
-  failInitialization(error: any): void {
-    clearTimeout(this.timeoutId);
-    ClixLogger.warn('Clix initialization failed:', error);
-    this.reject(error);
-  }
-}
+import { ClixInitCoordinator } from './ClixInitCoordinator';
 
 export class Clix {
   private static shared?: Clix;
-  private static initCoordinator = new InitCoordinator();
+  private static initCoordinator = new ClixInitCoordinator();
 
   protected storageService?: StorageService;
   protected eventService?: EventService;
@@ -59,6 +27,10 @@ export class Clix {
    */
   static async initialize(config: ClixConfig): Promise<void> {
     try {
+      if (this.initCoordinator.isInitializationFailed()) {
+        this.initCoordinator.reset();
+      }
+
       ClixLogger.setLogLevel(config.logLevel || ClixLogLevel.ERROR);
       ClixLogger.info('Initializing Clix SDK');
 
@@ -68,8 +40,10 @@ export class Clix {
       ClixLogger.info('Clix SDK initialized successfully');
       this.initCoordinator.completeInitialization();
     } catch (error) {
-      this.initCoordinator.failInitialization(error);
-      throw ClixError.notInitialized({ cause: error });
+      const errorInstance =
+        error instanceof Error ? error : new Error(String(error));
+      this.initCoordinator.failInitialization(errorInstance);
+      throw ClixError.notInitialized({ cause: errorInstance });
     }
   }
 
@@ -77,54 +51,54 @@ export class Clix {
    * Set configuration
    */
   private async setConfig(config: ClixConfig): Promise<void> {
-    // Initialize storage service
-    this.storageService = StorageService.getInstance();
+    this.storageService = new StorageService();
 
-    // Store configuration
-    await this.storageService.set('project_id', config.projectId);
-    await this.storageService.set('api_key', config.apiKey);
+    try {
+      await this.storageService.set('project_id', config.projectId);
+      await this.storageService.set('api_key', config.apiKey);
+      await this.storageService.set('clix_config', {
+        projectId: config.projectId,
+        apiKey: config.apiKey,
+        endpoint: config.endpoint,
+        logLevel: config.logLevel,
+        extraHeaders: config.extraHeaders,
+      });
+    } catch (error) {
+      ClixLogger.warn(
+        'Failed to store configuration in storage, continuing with in-memory config',
+        error
+      );
+    }
 
-    // Store full config for background handler
-    await this.storageService.set('clix_config', {
-      projectId: config.projectId,
-      apiKey: config.apiKey,
-      endpoint: config.endpoint,
-      logLevel: config.logLevel,
-      extraHeaders: config.extraHeaders,
-    });
-
-    // Initialize API client
     const apiClient = new ClixAPIClient({
       ...config,
       endpoint: config.endpoint || 'https://api.clix.so',
       logLevel: config.logLevel || ClixLogLevel.ERROR,
     });
 
-    // Initialize API services
     const deviceAPIService = new DeviceAPIService(apiClient);
     const eventAPIService = new EventAPIService(apiClient);
-
-    // Initialize token service
     const tokenService = new TokenService(this.storageService);
-
-    // Initialize device service
     this.deviceService = new DeviceService(
       this.storageService,
       tokenService,
       deviceAPIService
     );
-
-    // Initialize event service
     this.eventService = new EventService(eventAPIService, this.deviceService);
-
-    // Initialize notification service
     this.notificationService = new NotificationService();
-    await this.notificationService.initialize(
-      this.eventService,
-      this.storageService,
-      this.deviceService,
-      tokenService
-    );
+    try {
+      await this.notificationService.initialize({
+        eventService: this.eventService,
+        storageService: this.storageService,
+        deviceService: this.deviceService,
+        tokenService: tokenService,
+      });
+    } catch (error) {
+      ClixLogger.warn(
+        'Failed to fully initialize notification service, some features may be limited',
+        error
+      );
+    }
   }
 
   /**
@@ -133,7 +107,9 @@ export class Clix {
   static async setUserId(userId: string): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
-      await this.shared!.deviceService!.setProjectUserId(userId);
+      if (this.shared?.deviceService) {
+        await this.shared.deviceService.setProjectUserId(userId);
+      }
     } catch (error) {
       ClixLogger.error(`Failed to set user ID: ${error}`);
     }
@@ -145,7 +121,9 @@ export class Clix {
   static async removeUserId(): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
-      await this.shared!.deviceService!.removeProjectUserId();
+      if (this.shared?.deviceService) {
+        await this.shared.deviceService.removeProjectUserId();
+      }
     } catch (error) {
       ClixLogger.error(`Failed to remove user ID: ${error}`);
     }
@@ -157,9 +135,11 @@ export class Clix {
   static async setUserProperty(key: string, value: any): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
-      await this.shared!.deviceService!.updateUserProperties({
-        [key]: value,
-      });
+      if (this.shared?.deviceService) {
+        await this.shared.deviceService.updateUserProperties({
+          [key]: value,
+        });
+      }
     } catch (error) {
       ClixLogger.error(`Failed to set user property: ${error}`);
     }
@@ -173,7 +153,9 @@ export class Clix {
   ): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
-      await this.shared!.deviceService!.updateUserProperties(userProperties);
+      if (this.shared?.deviceService) {
+        await this.shared.deviceService.updateUserProperties(userProperties);
+      }
     } catch (error) {
       ClixLogger.error(`Failed to set user properties: ${error}`);
     }
@@ -185,7 +167,9 @@ export class Clix {
   static async removeUserProperty(key: string): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
-      await this.shared!.deviceService!.removeUserProperties([key]);
+      if (this.shared?.deviceService) {
+        await this.shared.deviceService.removeUserProperties([key]);
+      }
     } catch (error) {
       ClixLogger.error(`Failed to remove user property: ${error}`);
     }
@@ -197,7 +181,9 @@ export class Clix {
   static async removeUserProperties(keys: string[]): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
-      await this.shared!.deviceService!.removeUserProperties(keys);
+      if (this.shared?.deviceService) {
+        await this.shared.deviceService.removeUserProperties(keys);
+      }
     } catch (error) {
       ClixLogger.error(`Failed to remove user properties: ${error}`);
     }
@@ -209,8 +195,11 @@ export class Clix {
   static async getDeviceId(): Promise<string | undefined> {
     try {
       await Clix.initCoordinator.waitForInitialization();
-      const deviceId = await this.shared!.deviceService!.getCurrentDeviceId();
-      return deviceId;
+      if (this.shared?.deviceService) {
+        const deviceId = await this.shared.deviceService.getCurrentDeviceId();
+        return deviceId;
+      }
+      return undefined;
     } catch (error) {
       ClixLogger.error(`Failed to get device ID: ${error}`);
       return undefined;
@@ -223,13 +212,18 @@ export class Clix {
   static async getPushToken(): Promise<string | undefined> {
     try {
       await Clix.initCoordinator.waitForInitialization();
-      const token = await this.shared!.notificationService!.getCurrentToken();
-      return token || undefined;
+      if (this.shared?.notificationService) {
+        const token = await this.shared.notificationService.getCurrentToken();
+        return token || undefined;
+      }
+      return undefined;
     } catch (error) {
       ClixLogger.error(`Failed to get push token: ${error}`);
       return undefined;
     }
   }
+
+
 
   /**
    * Set log level
@@ -250,11 +244,13 @@ export class Clix {
   ): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
-      await this.shared!.eventService!.trackEvent(
-        name,
-        options?.properties,
-        options?.messageId
-      );
+      if (this.shared?.eventService) {
+        await this.shared.eventService.trackEvent(
+          name,
+          options?.properties,
+          options?.messageId
+        );
+      }
     } catch (error) {
       ClixLogger.error(`Failed to track event: ${error}`);
     }
