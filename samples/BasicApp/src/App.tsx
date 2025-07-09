@@ -5,7 +5,7 @@
  * @format
  */
 
-import Clix from '@clix/react-native-sdk';
+import Clix, { ClixLogLevel } from '@clix/react-native-sdk';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -39,12 +39,31 @@ function App() {
       try {
         // Use a fallback log level if ClixLogLevel.Debug is not available
         try {
+          await Clix.initialize({
+            projectId: ClixInfo.projectId,
+            apiKey: ClixInfo.apiKey,
+            logLevel: ClixLogLevel.DEBUG,
+          });
           const currentDeviceId = await Clix.getDeviceId();
           const currentPushToken = await Clix.getPushToken();
 
           // Update state with null if values are undefined
           setDeviceId(currentDeviceId || null);
           setPushToken(currentPushToken || null);
+
+          // 🔍 DEBUGGING: 초기화 후 푸시 알림 디버깅 실행
+          console.log('🚀 Starting push notification debugging...');
+          setTimeout(async () => {
+            try {
+              // @ts-ignore - 디버깅용 임시 코드
+              await Clix.debugPushNotifications();
+              // @ts-ignore - 디버깅용 임시 코드
+              await Clix.refreshPushHandlers();
+              console.log('✅ Push notification debugging completed');
+            } catch (debugError) {
+              console.error('❌ Push debugging failed:', debugError);
+            }
+          }, 2000);
         } catch (deviceError) {
           console.warn(
             'Failed to get device info immediately after init:',
@@ -206,6 +225,62 @@ function App() {
           >
             <Text style={styles.buttonText}>Set User Property</Text>
           </TouchableOpacity>
+
+          {/* 🔍 디버깅 버튼들 추가 */}
+          <View style={styles.debugSection}>
+            <Text style={styles.debugTitle}>🔍 Push Notification Debug</Text>
+
+            <TouchableOpacity
+              style={styles.debugButton}
+              onPress={async () => {
+                try {
+                  console.log('🔍 Manual debug triggered');
+                  // @ts-ignore
+                  await Clix.debugPushNotifications();
+                  Alert.alert('Debug', 'Push debug completed - check logs!');
+                } catch (error) {
+                  console.error('Debug failed:', error);
+                  Alert.alert('Error', 'Debug failed: ' + error);
+                }
+              }}
+            >
+              <Text style={styles.buttonText}>Debug Push Setup</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.debugButton}
+              onPress={async () => {
+                try {
+                  console.log('🔄 Manual handler refresh triggered');
+                  // @ts-ignore
+                  await Clix.refreshPushHandlers();
+                  Alert.alert('Refresh', 'Handlers refreshed - check logs!');
+                } catch (error) {
+                  console.error('Refresh failed:', error);
+                  Alert.alert('Error', 'Refresh failed: ' + error);
+                }
+              }}
+            >
+              <Text style={styles.buttonText}>Refresh Handlers</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.debugButton}
+              onPress={async () => {
+                try {
+                  console.log('🌍 Global FCM check triggered');
+                  // @ts-ignore
+                  await Clix.checkFCMStatus();
+                  Alert.alert('FCM Check', 'FCM status checked - see logs!');
+                } catch (error) {
+                  console.error('FCM check failed:', error);
+                  Alert.alert('Error', 'FCM check failed: ' + error);
+                }
+              }}
+            >
+              <Text style={styles.buttonText}>Check FCM Status</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -304,6 +379,27 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 10,
+  },
+  debugSection: {
+    marginTop: 30,
+    paddingTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+  },
+  debugTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFF',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  debugButton: {
+    backgroundColor: '#FF6B35',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    marginBottom: 10,
+    alignItems: 'center',
   },
 });
 

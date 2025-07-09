@@ -231,6 +231,58 @@ export class Clix {
   }
 
   /**
+   * Debug push notification setup - 푸시 알림 설정 디버깅
+   */
+  static async debugPushNotifications(): Promise<void> {
+    try {
+      ClixLogger.info('🔍 Starting push notification debug...');
+      await Clix.initCoordinator.waitForInitialization();
+      
+      if (this.shared?.notificationService) {
+        ClixLogger.info('📱 NotificationService available, running debug...');
+        await this.shared.notificationService.debugPushReceive();
+        
+        // 테스트 알림도 표시
+        await this.shared.notificationService.testNotificationDisplay();
+      } else {
+        ClixLogger.error('❌ NotificationService not available for debugging');
+      }
+    } catch (error) {
+      ClixLogger.error('Failed to debug push notifications:', error);
+    }
+  }
+
+  /**
+   * Force refresh push notification handlers - 푸시 알림 핸들러 강제 새로고침
+   */
+  static async refreshPushHandlers(): Promise<void> {
+    try {
+      ClixLogger.info('🔄 Refreshing push notification handlers...');
+      await Clix.initCoordinator.waitForInitialization();
+      
+      if (this.shared?.notificationService) {
+        await this.shared.notificationService.forceRefreshHandlers();
+        ClixLogger.info('✅ Push handlers refreshed successfully');
+      } else {
+        ClixLogger.error('❌ NotificationService not available for refresh');
+      }
+    } catch (error) {
+      ClixLogger.error('Failed to refresh push handlers:', error);
+    }
+  }
+
+  /**
+   * Check global FCM status - 전역 FCM 상태 확인
+   */
+  static async checkFCMStatus(): Promise<void> {
+    try {
+      await NotificationService.checkGlobalFCMStatus();
+    } catch (error) {
+      ClixLogger.error('Failed to check FCM status:', error);
+    }
+  }
+
+  /**
    * Track event
    */
   protected static async trackEvent(
