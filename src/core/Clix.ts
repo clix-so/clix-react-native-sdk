@@ -237,11 +237,11 @@ export class Clix {
     try {
       ClixLogger.info('🔍 Starting push notification debug...');
       await Clix.initCoordinator.waitForInitialization();
-      
+
       if (this.shared?.notificationService) {
         ClixLogger.info('📱 NotificationService available, running debug...');
         await this.shared.notificationService.debugPushReceive();
-        
+
         // 테스트 알림도 표시
         await this.shared.notificationService.testNotificationDisplay();
       } else {
@@ -259,7 +259,7 @@ export class Clix {
     try {
       ClixLogger.info('🔄 Refreshing push notification handlers...');
       await Clix.initCoordinator.waitForInitialization();
-      
+
       if (this.shared?.notificationService) {
         await this.shared.notificationService.forceRefreshHandlers();
         ClixLogger.info('✅ Push handlers refreshed successfully');

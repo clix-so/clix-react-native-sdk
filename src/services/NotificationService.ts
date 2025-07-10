@@ -30,7 +30,7 @@ export class NotificationService {
   private static readonly CHANNEL_ID = 'clix_channel';
   private static readonly CHANNEL_NAME = 'Clix Notifications';
 
-  private firebaseMessaging = messaging();
+  private firebaseMessaging: ReturnType<typeof messaging>;
   private isInitialized = false;
   private currentToken: string | null = null;
 
@@ -44,6 +44,7 @@ export class NotificationService {
   private unsubscribeTokenRefresh?: () => void;
 
   constructor() {
+    this.firebaseMessaging = messaging();
     ClixLogger.info('📱 NotificationService constructor called');
     ClixLogger.debug('NotificationService.constructor - Initial FCM state:', {
       hasMessaging: !!this.firebaseMessaging,
@@ -70,11 +71,11 @@ export class NotificationService {
         'hasPermission',
       ];
 
+      const firebaseMessaging = this.firebaseMessaging;
       const availableMethods = methods.filter(
         (method) =>
-          typeof this.firebaseMessaging[
-            method as keyof typeof this.firebaseMessaging
-          ] === 'function'
+          typeof firebaseMessaging[method as keyof typeof firebaseMessaging] ===
+          'function'
       );
 
       ClixLogger.debug(
@@ -1671,17 +1672,17 @@ export class NotificationService {
     ClixLogger.info('🌍 Checking global FCM status...');
 
     try {
-      const messaging = messaging();
+      const firebaseMessaging = messaging();
       ClixLogger.debug('Global FCM messaging instance created');
 
-      const isSupported = (await messaging.isSupported?.()) ?? true;
+      const isSupported = (await firebaseMessaging.isSupported?.()) ?? true;
       ClixLogger.debug('Global FCM supported:', isSupported);
 
-      const hasPermission = await messaging.hasPermission();
+      const hasPermission = await firebaseMessaging.hasPermission();
       ClixLogger.debug('Global FCM permission:', hasPermission);
 
       try {
-        const token = await messaging.getToken();
+        const token = await firebaseMessaging.getToken();
         ClixLogger.debug('Global FCM token available:', !!token);
         if (token) {
           ClixLogger.debug(
@@ -1803,7 +1804,7 @@ export class NotificationService {
 
       // 임시로 테스트 핸들러 중복 등록하여 확인
       const testUnsubscribe = this.firebaseMessaging.onMessage(
-        async (message) => {
+        async (_message) => {
           ClixLogger.info(
             '🧪 TEST HANDLER TRIGGERED - DUPLICATE REGISTRATION TEST 🧪'
           );
