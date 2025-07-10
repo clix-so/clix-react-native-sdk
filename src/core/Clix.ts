@@ -7,9 +7,12 @@ import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { TokenService } from '../services/TokenService';
 import { ClixError } from '../utils/ClixError';
-import { ClixLogLevel, ClixLogger } from '../utils/logging/ClixLogger';
+import { ClixLogger, ClixLogLevel } from '../utils/logging/ClixLogger';
 import type { ClixConfig } from './ClixConfig';
 import { ClixInitCoordinator } from './ClixInitCoordinator';
+import messaging from '@react-native-firebase/messaging';
+
+console.log(messaging());
 
 export class Clix {
   private static shared?: Clix;
@@ -85,20 +88,20 @@ export class Clix {
       deviceAPIService
     );
     this.eventService = new EventService(eventAPIService, this.deviceService);
-    this.notificationService = new NotificationService();
-    try {
-      await this.notificationService.initialize(
-        this.eventService,
-        this.storageService,
-        this.deviceService,
-        tokenService
-      );
-    } catch (error) {
-      ClixLogger.warn(
-        'Failed to fully initialize notification service, some features may be limited',
-        error
-      );
-    }
+    // this.notificationService = new NotificationService();
+    // try {
+    //   await this.notificationService.initialize(
+    //     this.eventService,
+    //     this.storageService,
+    //     this.deviceService,
+    //     tokenService
+    //   );
+    // } catch (error) {
+    //   ClixLogger.warn(
+    //     'Failed to fully initialize notification service, some features may be limited',
+    //     error
+    //   );
+    // }
   }
 
   /**
@@ -228,58 +231,6 @@ export class Clix {
    */
   static setLogLevel(level: ClixLogLevel): void {
     ClixLogger.setLogLevel(level);
-  }
-
-  /**
-   * Debug push notification setup - 푸시 알림 설정 디버깅
-   */
-  static async debugPushNotifications(): Promise<void> {
-    try {
-      ClixLogger.info('🔍 Starting push notification debug...');
-      await Clix.initCoordinator.waitForInitialization();
-
-      if (this.shared?.notificationService) {
-        ClixLogger.info('📱 NotificationService available, running debug...');
-        await this.shared.notificationService.debugPushReceive();
-
-        // 테스트 알림도 표시
-        await this.shared.notificationService.testNotificationDisplay();
-      } else {
-        ClixLogger.error('❌ NotificationService not available for debugging');
-      }
-    } catch (error) {
-      ClixLogger.error('Failed to debug push notifications:', error);
-    }
-  }
-
-  /**
-   * Force refresh push notification handlers - 푸시 알림 핸들러 강제 새로고침
-   */
-  static async refreshPushHandlers(): Promise<void> {
-    try {
-      ClixLogger.info('🔄 Refreshing push notification handlers...');
-      await Clix.initCoordinator.waitForInitialization();
-
-      if (this.shared?.notificationService) {
-        await this.shared.notificationService.forceRefreshHandlers();
-        ClixLogger.info('✅ Push handlers refreshed successfully');
-      } else {
-        ClixLogger.error('❌ NotificationService not available for refresh');
-      }
-    } catch (error) {
-      ClixLogger.error('Failed to refresh push handlers:', error);
-    }
-  }
-
-  /**
-   * Check global FCM status - 전역 FCM 상태 확인
-   */
-  static async checkFCMStatus(): Promise<void> {
-    try {
-      await NotificationService.checkGlobalFCMStatus();
-    } catch (error) {
-      ClixLogger.error('Failed to check FCM status:', error);
-    }
   }
 
   /**

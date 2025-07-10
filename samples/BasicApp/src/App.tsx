@@ -37,33 +37,24 @@ function App() {
   useEffect(() => {
     const initializeSDK = async () => {
       try {
+        // Initialize Clix SDK
+        await Clix.initialize({
+          projectId: projectId,
+          apiKey: apiKey,
+          logLevel: ClixLogLevel.DEBUG,
+        });
+        // messaging().onMessage(async (remoteMessage) => {
+        //   console.log(JSON.stringify(remoteMessage));
+        // });
+
         // Use a fallback log level if ClixLogLevel.Debug is not available
         try {
-          await Clix.initialize({
-            projectId: ClixInfo.projectId,
-            apiKey: ClixInfo.apiKey,
-            logLevel: ClixLogLevel.DEBUG,
-          });
           const currentDeviceId = await Clix.getDeviceId();
           const currentPushToken = await Clix.getPushToken();
 
           // Update state with null if values are undefined
           setDeviceId(currentDeviceId || null);
           setPushToken(currentPushToken || null);
-
-          // 🔍 DEBUGGING: 초기화 후 푸시 알림 디버깅 실행
-          console.log('🚀 Starting push notification debugging...');
-          setTimeout(async () => {
-            try {
-              // @ts-ignore - 디버깅용 임시 코드
-              await Clix.debugPushNotifications();
-              // @ts-ignore - 디버깅용 임시 코드
-              await Clix.refreshPushHandlers();
-              console.log('✅ Push notification debugging completed');
-            } catch (debugError) {
-              console.error('❌ Push debugging failed:', debugError);
-            }
-          }, 2000);
         } catch (deviceError) {
           console.warn(
             'Failed to get device info immediately after init:',
