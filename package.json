@@ -32,7 +32,7 @@
     "!**/.*"
   ],
   "scripts": {
-    "test": "jest",
+    "test": "jest --passWithNoTests",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"**/*.{js,ts,tsx}\"",
     "prepare": "bob build",
