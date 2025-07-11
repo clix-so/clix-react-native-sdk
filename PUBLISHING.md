@@ -1,6 +1,6 @@
 # Publishing to GitHub Packages
 
-This document explains how to publish the `@clix/react-native-sdk` package to GitHub Packages.
+This document explains how to publish the `@clix-so/react-native-sdk` package to GitHub Packages.
 
 ## Overview
 
@@ -45,7 +45,7 @@ The package is published to GitHub Packages using GitHub Actions workflows. The 
 3. **Package Configuration**: The package is configured for GitHub Packages:
    - `publishConfig.registry` set to `https://npm.pkg.github.com`
    - `.npmrc` file configured for authentication
-   - Package scope set to `@clix`
+   - Package scope set to `@clix-so`
 
 ### Publishing Steps
 
@@ -74,19 +74,19 @@ To manually trigger publishing:
 Users can install the package using:
 
 ```bash
-npm install @clix/react-native-sdk
+npm install @clix-so/react-native-sdk
 ```
 
 If they encounter authentication issues, they may need to:
 
 1. **Login to GitHub Packages**:
    ```bash
-   npm login --scope=@clix --registry=https://npm.pkg.github.com
+   npm login --scope=@clix-so --registry=https://npm.pkg.github.com
    ```
 
 2. **Create `.npmrc` file**:
    ```
-   @clix:registry=https://npm.pkg.github.com
+   @clix-so:registry=https://npm.pkg.github.com
    //npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
    ```
 

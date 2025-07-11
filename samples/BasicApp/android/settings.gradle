@@ -12,4 +12,4 @@ rootProject.name = 'ClixSample'
 include ':app'
 
 include ':clix_react-native-sdk'
-project(':clix_react-native-sdk').projectDir = new File(rootProject.projectDir, '../node_modules/@clix/react-native-sdk/android')
+project(':clix_react-native-sdk').projectDir = new File(rootProject.projectDir, '../node_modules/@clix-so/react-native-sdk/android')

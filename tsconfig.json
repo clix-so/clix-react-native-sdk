@@ -2,7 +2,7 @@
   "compilerOptions": {
     "rootDir": ".",
     "paths": {
-      "@clix/react-native-sdk": ["./src/index"]
+      "@clix-so/react-native-sdk": ["./src/index"]
     },
     "allowUnreachableCode": false,
     "allowUnusedLabels": false,

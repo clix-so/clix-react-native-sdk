@@ -24,7 +24,7 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://npm.pkg.github.com'
-          scope: '@clix'
+          scope: '@clix-so'
           
       - name: Check npm identity
         run: npm whoami --registry=https://npm.pkg.github.com
