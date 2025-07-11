@@ -4,8 +4,23 @@ Clix SDK for React Native
 
 ## Installation
 
+### From GitHub Packages
+
 ```sh
 npm install @clix/react-native-sdk
+```
+
+**Note**: This package is published to GitHub Packages. If you encounter authentication issues, you may need to configure npm to use GitHub Packages:
+
+```sh
+npm login --scope=@clix --registry=https://npm.pkg.github.com
+```
+
+Or create a `.npmrc` file in your project:
+
+```
+@clix:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
 ```
 
 ## Usage

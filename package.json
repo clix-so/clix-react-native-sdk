@@ -56,7 +56,7 @@
   },
   "homepage": "https://github.com/clix-so/clix-react-native-sdk#readme",
   "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://npm.pkg.github.com"
   },
   "packageManager": "npm@10.9.2",
   "peerDependencies": {
