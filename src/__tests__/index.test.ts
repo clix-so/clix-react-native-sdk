@@ -8,4 +8,4 @@ describe('Clix SDK', () => {
   it('should have initialize method', () => {
     expect(typeof Clix.initialize).toBe('function');
   });
-}); 
+});

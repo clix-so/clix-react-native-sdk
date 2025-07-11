@@ -24,4 +24,4 @@ describe('Clix Core', () => {
   it('should have getPushToken method', () => {
     expect(typeof Clix.getPushToken).toBe('function');
   });
-}); 
+});
