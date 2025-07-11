@@ -1,6 +1,6 @@
 import { ClixLogger } from '../utils/logging/ClixLogger';
-import { EventAPIService } from './EventAPIService';
 import { DeviceService } from './DeviceService';
+import { EventAPIService } from './EventAPIService';
 
 export class EventService {
   constructor(
@@ -34,7 +34,7 @@ export class EventService {
         messageId
       );
 
-      ClixLogger.info(`Event tracked successfully: ${name}`);
+      ClixLogger.debug(`Event tracked successfully: ${name}`);
     } catch (error) {
       ClixLogger.error(
         `Failed to track event '${name}': ${error}. Make sure Clix.initialize() has been called.`

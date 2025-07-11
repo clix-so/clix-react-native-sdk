@@ -37,7 +37,7 @@ export class DeviceService {
     try {
       const deviceId = await this.getCurrentDeviceId();
       await this.deviceAPIService.setProjectUserId(deviceId, projectUserId);
-      ClixLogger.info(`Project user ID set: ${projectUserId}`);
+      ClixLogger.debug(`Project user ID set: ${projectUserId}`);
     } catch (error) {
       ClixLogger.error('Failed to set project user ID', error);
       throw ClixError.unknownError({
@@ -51,7 +51,7 @@ export class DeviceService {
     try {
       const deviceId = await this.getCurrentDeviceId();
       await this.deviceAPIService.removeProjectUserId(deviceId);
-      ClixLogger.info('Project user ID removed');
+      ClixLogger.debug('Project user ID removed');
     } catch (error) {
       ClixLogger.error('Failed to remove project user ID', error);
       throw ClixError.unknownError({
@@ -73,7 +73,7 @@ export class DeviceService {
         userProperties
       );
 
-      ClixLogger.info(
+      ClixLogger.debug(
         `User properties updated: ${Object.keys(properties).join(', ')}`
       );
     } catch (error) {
@@ -90,7 +90,7 @@ export class DeviceService {
       const deviceId = await this.getCurrentDeviceId();
       await this.deviceAPIService.removeUserProperties(deviceId, names);
 
-      ClixLogger.info(`User properties removed: ${names.join(', ')}`);
+      ClixLogger.debug(`User properties removed: ${names.join(', ')}`);
     } catch (error) {
       ClixLogger.error('Failed to remove user properties', error);
       throw ClixError.unknownError({
@@ -109,7 +109,7 @@ export class DeviceService {
 
       await this.deviceAPIService.registerDevice(device);
 
-      ClixLogger.info(`Token upserted: ${tokenType}`);
+      ClixLogger.debug(`Token upserted: ${tokenType}`);
     } catch (error) {
       ClixLogger.error('Failed to upsert token', error);
 

@@ -42,7 +42,7 @@ export class DeviceAPIService {
         );
       }
 
-      ClixLogger.info(`Device upserted successfully: ${device.id}`);
+      ClixLogger.debug(`Device upserted successfully: ${device.id}`);
     } catch (error) {
       ClixLogger.error(`Failed to upsert device: ${device.id}`, error);
       throw error;
@@ -71,7 +71,7 @@ export class DeviceAPIService {
         );
       }
 
-      ClixLogger.info(
+      ClixLogger.debug(
         `Project user ID set successfully for device: ${deviceId}`
       );
     } catch (error) {
@@ -97,7 +97,7 @@ export class DeviceAPIService {
         );
       }
 
-      ClixLogger.info(
+      ClixLogger.debug(
         `Project user ID removed successfully for device: ${deviceId}`
       );
     } catch (error) {
@@ -137,7 +137,7 @@ export class DeviceAPIService {
         );
       }
 
-      ClixLogger.info(
+      ClixLogger.debug(
         `User properties upserted successfully for device: ${deviceId}`
       );
     } catch (error) {
@@ -173,7 +173,7 @@ export class DeviceAPIService {
         );
       }
 
-      ClixLogger.info(
+      ClixLogger.debug(
         `User properties removed successfully for device: ${deviceId}`
       );
     } catch (error) {

@@ -34,7 +34,7 @@ export class EventAPIService {
         );
       }
 
-      ClixLogger.info(
+      ClixLogger.debug(
         `Event tracked successfully: ${name} for device: ${deviceId}`
       );
     } catch (error) {

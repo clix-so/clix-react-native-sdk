@@ -1,11 +1,4 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
-
-import Clix, { ClixLogLevel } from '@clix/react-native-sdk';
+import Clix from '@clix/react-native-sdk';
 import { useEffect, useState } from 'react';
 import {
   Alert,
@@ -23,7 +16,6 @@ import {
 import { ClixInfo } from './ClixInfo';
 
 function App() {
-  // Theme configuration
   useColorScheme();
   const [userId, setUserId] = useState('');
   const [propertyKey, setPropertyKey] = useState('');
@@ -31,28 +23,12 @@ function App() {
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [pushToken, setPushToken] = useState<string | null>(null);
 
-  const projectId = ClixInfo.projectId;
-  const apiKey = ClixInfo.apiKey;
-
   useEffect(() => {
-    const initializeSDK = async () => {
+    const initialize = async () => {
       try {
-        // Initialize Clix SDK
-        await Clix.initialize({
-          projectId: projectId,
-          apiKey: apiKey,
-          logLevel: ClixLogLevel.DEBUG,
-        });
-        // messaging().onMessage(async (remoteMessage) => {
-        //   console.log(JSON.stringify(remoteMessage));
-        // });
-
-        // Use a fallback log level if ClixLogLevel.Debug is not available
         try {
           const currentDeviceId = await Clix.getDeviceId();
           const currentPushToken = await Clix.getPushToken();
-
-          // Update state with null if values are undefined
           setDeviceId(currentDeviceId || null);
           setPushToken(currentPushToken || null);
         } catch (deviceError) {
@@ -60,11 +36,8 @@ function App() {
             'Failed to get device info immediately after init:',
             deviceError
           );
-          // Set placeholders and try again later
           setDeviceId('Loading...');
           setPushToken('Loading...');
-
-          // Retry after a delay
           setTimeout(async () => {
             try {
               const currentDeviceId = await Clix.getDeviceId();
@@ -83,21 +56,8 @@ function App() {
         Alert.alert('Error', `Failed to initialize Clix SDK: ${error}`);
       }
     };
-
-    initializeSDK();
-
-    // Note: Clix SDK handles all notification logic internally
-    // No need to set up listeners as the SDK manages everything
-    // The SDK will automatically handle:
-    // - Foreground message display
-    // - Background message handling
-    // - Notification tap handling
-    // - Token management
-    // - Permission management
-
-    return () => {
-      // Cleanup handled by Clix SDK
-    };
+    initialize();
+    return () => {};
   }, []);
 
   const handleSubmitUserId = async () => {
@@ -151,12 +111,12 @@ function App() {
 
           <View style={styles.infoContainer}>
             <Text style={styles.label}>Project ID:</Text>
-            <Text style={styles.infoText}>{projectId}</Text>
+            <Text style={styles.infoText}>{ClixInfo.projectId}</Text>
           </View>
 
           <View style={styles.infoContainer}>
             <Text style={styles.label}>API Key:</Text>
-            <Text style={styles.infoText}>{apiKey}</Text>
+            <Text style={styles.infoText}>{ClixInfo.apiKey}</Text>
           </View>
 
           <View style={styles.infoContainer}>
@@ -216,62 +176,6 @@ function App() {
           >
             <Text style={styles.buttonText}>Set User Property</Text>
           </TouchableOpacity>
-
-          {/* 🔍 디버깅 버튼들 추가 */}
-          <View style={styles.debugSection}>
-            <Text style={styles.debugTitle}>🔍 Push Notification Debug</Text>
-
-            <TouchableOpacity
-              style={styles.debugButton}
-              onPress={async () => {
-                try {
-                  console.log('🔍 Manual debug triggered');
-                  // @ts-ignore
-                  await Clix.debugPushNotifications();
-                  Alert.alert('Debug', 'Push debug completed - check logs!');
-                } catch (error) {
-                  console.error('Debug failed:', error);
-                  Alert.alert('Error', 'Debug failed: ' + error);
-                }
-              }}
-            >
-              <Text style={styles.buttonText}>Debug Push Setup</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.debugButton}
-              onPress={async () => {
-                try {
-                  console.log('🔄 Manual handler refresh triggered');
-                  // @ts-ignore
-                  await Clix.refreshPushHandlers();
-                  Alert.alert('Refresh', 'Handlers refreshed - check logs!');
-                } catch (error) {
-                  console.error('Refresh failed:', error);
-                  Alert.alert('Error', 'Refresh failed: ' + error);
-                }
-              }}
-            >
-              <Text style={styles.buttonText}>Refresh Handlers</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.debugButton}
-              onPress={async () => {
-                try {
-                  console.log('🌍 Global FCM check triggered');
-                  // @ts-ignore
-                  await Clix.checkFCMStatus();
-                  Alert.alert('FCM Check', 'FCM status checked - see logs!');
-                } catch (error) {
-                  console.error('FCM check failed:', error);
-                  Alert.alert('Error', 'FCM check failed: ' + error);
-                }
-              }}
-            >
-              <Text style={styles.buttonText}>Check FCM Status</Text>
-            </TouchableOpacity>
-          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -370,27 +274,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginBottom: 10,
-  },
-  debugSection: {
-    marginTop: 30,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#333',
-  },
-  debugTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFF',
-    marginBottom: 15,
-    textAlign: 'center',
-  },
-  debugButton: {
-    backgroundColor: '#FF6B35',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    marginBottom: 10,
-    alignItems: 'center',
   },
 });
 

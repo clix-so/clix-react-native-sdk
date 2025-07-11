@@ -10,9 +10,6 @@ import { ClixError } from '../utils/ClixError';
 import { ClixLogger, ClixLogLevel } from '../utils/logging/ClixLogger';
 import type { ClixConfig } from './ClixConfig';
 import { ClixInitCoordinator } from './ClixInitCoordinator';
-import messaging from '@react-native-firebase/messaging';
-
-console.log(messaging());
 
 export class Clix {
   private static shared?: Clix;
@@ -35,12 +32,12 @@ export class Clix {
       }
 
       ClixLogger.setLogLevel(config.logLevel || ClixLogLevel.ERROR);
-      ClixLogger.info('Initializing Clix SDK');
+      ClixLogger.debug('Initializing Clix SDK');
 
       this.shared = new Clix();
       await this.shared.setConfig(config);
 
-      ClixLogger.info('Clix SDK initialized successfully');
+      ClixLogger.debug('Clix SDK initialized successfully');
       this.initCoordinator.completeInitialization();
     } catch (error) {
       const errorInstance =
@@ -48,60 +45,6 @@ export class Clix {
       this.initCoordinator.failInitialization(errorInstance);
       throw ClixError.notInitialized({ cause: errorInstance });
     }
-  }
-
-  /**
-   * Set configuration
-   */
-  private async setConfig(config: ClixConfig): Promise<void> {
-    this.storageService = new StorageService();
-
-    try {
-      await this.storageService.set('project_id', config.projectId);
-      await this.storageService.set('api_key', config.apiKey);
-      await this.storageService.set('clix_config', {
-        projectId: config.projectId,
-        apiKey: config.apiKey,
-        endpoint: config.endpoint,
-        logLevel: config.logLevel,
-        extraHeaders: config.extraHeaders,
-      });
-    } catch (error) {
-      ClixLogger.warn(
-        'Failed to store configuration in storage, continuing with in-memory config',
-        error
-      );
-    }
-
-    const apiClient = new ClixAPIClient({
-      ...config,
-      endpoint: config.endpoint || 'https://api.clix.so',
-      logLevel: config.logLevel || ClixLogLevel.ERROR,
-    });
-
-    const deviceAPIService = new DeviceAPIService(apiClient);
-    const eventAPIService = new EventAPIService(apiClient);
-    const tokenService = new TokenService(this.storageService);
-    this.deviceService = new DeviceService(
-      this.storageService,
-      tokenService,
-      deviceAPIService
-    );
-    this.eventService = new EventService(eventAPIService, this.deviceService);
-    // this.notificationService = new NotificationService();
-    // try {
-    //   await this.notificationService.initialize(
-    //     this.eventService,
-    //     this.storageService,
-    //     this.deviceService,
-    //     tokenService
-    //   );
-    // } catch (error) {
-    //   ClixLogger.warn(
-    //     'Failed to fully initialize notification service, some features may be limited',
-    //     error
-    //   );
-    // }
   }
 
   /**
@@ -254,6 +197,60 @@ export class Clix {
       }
     } catch (error) {
       ClixLogger.error(`Failed to track event: ${error}`);
+    }
+  }
+
+  /**
+   * Set configuration
+   */
+  private async setConfig(config: ClixConfig): Promise<void> {
+    this.storageService = new StorageService();
+
+    try {
+      await this.storageService.set('project_id', config.projectId);
+      await this.storageService.set('api_key', config.apiKey);
+      await this.storageService.set('clix_config', {
+        projectId: config.projectId,
+        apiKey: config.apiKey,
+        endpoint: config.endpoint,
+        logLevel: config.logLevel,
+        extraHeaders: config.extraHeaders,
+      });
+    } catch (error) {
+      ClixLogger.warn(
+        'Failed to store configuration in storage, continuing with in-memory config',
+        error
+      );
+    }
+
+    const apiClient = new ClixAPIClient({
+      ...config,
+      endpoint: config.endpoint || 'https://api.clix.so',
+      logLevel: config.logLevel || ClixLogLevel.ERROR,
+    });
+
+    const deviceAPIService = new DeviceAPIService(apiClient);
+    const eventAPIService = new EventAPIService(apiClient);
+    const tokenService = new TokenService(this.storageService);
+    this.deviceService = new DeviceService(
+      this.storageService,
+      tokenService,
+      deviceAPIService
+    );
+    this.eventService = new EventService(eventAPIService, this.deviceService);
+    try {
+      this.notificationService =
+        await NotificationService.getInstance().initialize(
+          this.eventService,
+          this.storageService,
+          this.deviceService,
+          tokenService
+        );
+    } catch (error) {
+      ClixLogger.warn(
+        'Failed to fully initialize notification service, some features may be limited',
+        error
+      );
     }
   }
 }

@@ -44,6 +44,7 @@ android.iml
 # Cocoapods
 #
 samples/**/ios/Pods
+samples/**/ios/Podfile.lock
 
 # Ruby
 samples/**/vendor/
