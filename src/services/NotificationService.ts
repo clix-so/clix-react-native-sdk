@@ -115,6 +115,35 @@ export class NotificationService {
     }
   }
 
+  async downloadImage(url: string): Promise<string> {
+    try {
+      const fileName = `clix_image_${Date.now()}`;
+      console.log(fileName);
+      const filePath = `${RNFS.CachesDirectoryPath}/${fileName}`;
+      console.log(filePath);
+      const result = await RNFS.downloadFile({
+        fromUrl: url,
+        toFile: filePath,
+      }).promise;
+      if (result.statusCode === 200) {
+        return `file://${filePath}`;
+      }
+    } catch (error) {
+      ClixLogger.warn('Failed to download image:', error);
+    }
+    throw new Error(`Failed to download image: ${url}`);
+  }
+
+  cleanup(): void {
+    this.unsubscribeForegroundMessage?.();
+    this.unsubscribeNotificationOpened?.();
+    this.unsubscribeTokenRefresh?.();
+    this.unsubscribeNotificationEvents?.();
+    this.isInitialized = false;
+    this.processedMessageIds.clear();
+    ClixLogger.debug('Notification service cleaned up');
+  }
+
   private async initializeNotificationDisplayService(): Promise<void> {
     await notifee.requestPermission({
       alert: true,
@@ -440,12 +469,19 @@ export class NotificationService {
           notificationContent.imageUrl
         );
         if (Platform.OS === 'ios') {
-          config.ios.attachments = [
-            {
-              url: await this.downloadImage(notificationContent.imageUrl),
-              typeHint: 'public.image',
-            },
-          ];
+          try {
+            const url = await this.downloadImage(notificationContent.imageUrl);
+            if (url) {
+              config.ios.attachments = [
+                {
+                  url,
+                  typeHint: 'public.image',
+                },
+              ];
+            }
+          } catch (error) {
+            ClixLogger.warn('Failed to download image attachment:', error);
+          }
         } else {
           config.android.style = {
             type: AndroidStyle.BIGPICTURE,
@@ -460,19 +496,6 @@ export class NotificationService {
       }
     }
     return config;
-  }
-
-  async downloadImage(url: string): Promise<string> {
-    const fileName = `clix_image_${Date.now()}`;
-    const filePath = `${RNFS.CachesDirectoryPath}/${fileName}`;
-    const result = await RNFS.downloadFile({
-      fromUrl: url,
-      toFile: filePath,
-    }).promise;
-    if (result.statusCode === 200) {
-      return `file://${filePath}`;
-    }
-    throw new Error('Failed to download image');
   }
 
   private createNotificationActions(clixPayload: ClixPushNotificationPayload) {
@@ -505,9 +528,7 @@ export class NotificationService {
   }
 
   private isValidImageUrl(url: string): boolean {
-    return (
-      typeof url === 'string' && url.trim() !== '' && url.startsWith('http')
-    );
+    return url.trim() !== '' && url.startsWith('http');
   }
 
   private extractNotificationContent(
@@ -729,15 +750,5 @@ export class NotificationService {
     } catch (error) {
       ClixLogger.error('Error tracking event in background', error);
     }
-  }
-
-  cleanup(): void {
-    this.unsubscribeForegroundMessage?.();
-    this.unsubscribeNotificationOpened?.();
-    this.unsubscribeTokenRefresh?.();
-    this.unsubscribeNotificationEvents?.();
-    this.isInitialized = false;
-    this.processedMessageIds.clear();
-    ClixLogger.debug('Notification service cleaned up');
   }
 }
