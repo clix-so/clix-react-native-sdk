@@ -40,7 +40,9 @@ The package is published to GitHub Packages using GitHub Actions workflows. The 
    - Go to Settings → Packages → Package creation
    - Ensure "Inherit access from source repository" is enabled
 
-2. **Package Configuration**: The package is configured for GitHub Packages:
+2. **Node.js Version**: The workflows use Node.js 20 to support `react-native-builder-bob` requirements
+
+3. **Package Configuration**: The package is configured for GitHub Packages:
    - `publishConfig.registry` set to `https://npm.pkg.github.com`
    - `.npmrc` file configured for authentication
    - Package scope set to `@clix`
