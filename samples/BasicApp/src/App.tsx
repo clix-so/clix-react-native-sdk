@@ -1,17 +1,17 @@
 import Clix from '@clix-so/react-native-sdk';
 import { useEffect, useState } from 'react';
 import {
-    Alert,
-    Image,
-    SafeAreaView,
-    ScrollView,
-    StatusBar,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    useColorScheme,
-    View,
+  Alert,
+  Image,
+  SafeAreaView,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  useColorScheme,
+  View,
 } from 'react-native';
 import { ClixInfo } from './ClixInfo';
 
