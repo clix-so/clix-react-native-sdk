@@ -65,9 +65,6 @@ Initialize the SDK with a ClixConfig. The config is required and contains your p
 ```typescript
 import Clix, { ClixLogLevel } from '@clix-so/react-native-sdk';
 
-// Initialize Firebase first
-await messaging().registerDeviceForRemoteMessages();
-
 // Initialize Clix SDK
 await Clix.initialize({
   projectId: 'YOUR_PROJECT_ID',
