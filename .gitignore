@@ -83,3 +83,6 @@ nitrogen/
 # Firebase Configuration Files
 GoogleService-Info.plist
 google-services.json
+
+# npm pack
+clix-so-react-native-sdk-*.tgz
