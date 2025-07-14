@@ -114,16 +114,15 @@ The Clix React Native SDK automatically handles push notification integration th
 
 #### Setup Firebase
 
-1. **Add Firebase to your React Native project**
-   - Follow the [React Native Firebase setup guide](https://rnfirebase.io/)
-   - Add `google-services.json` (Android) and `GoogleService-Info.plist` (iOS)
+**Complete Firebase Setup**: Follow the comprehensive setup guide at [React Native Firebase](https://rnfirebase.io/), which includes:
 
-2. **Enable Push Notifications**
-   - For iOS: Enable Push Notifications capability in Xcode
-   - For Android: No additional setup required
+- Creating a Firebase project
+- Adding your app to Firebase
+- Installing configuration files (`google-services.json` for Android, `GoogleService-Info.plist` for iOS)
+- Platform-specific setup for push notifications
+- Enabling Firebase Cloud Messaging in your Firebase console
 
-3. **Firebase Configuration**
-   - Configure Firebase according to the installation steps above
+For push notifications specifically, ensure you complete the [Messaging setup guide](https://rnfirebase.io/messaging/usage).
 
 #### Background Message Handler Setup
 
