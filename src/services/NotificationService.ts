@@ -9,7 +9,6 @@ import messaging, {
   FirebaseMessagingTypes,
 } from '@react-native-firebase/messaging';
 import { Linking, Platform } from 'react-native';
-import RNFS from 'react-native-fs';
 import type { ClixConfig } from '../core/ClixConfig';
 import { ClixPushNotificationPayload } from '../models/ClixPushNotificationPayload';
 import { ClixLogger } from '../utils/logging/ClixLogger';
@@ -113,25 +112,6 @@ export class NotificationService {
       ClixLogger.error('Failed to get push token', error);
       return null;
     }
-  }
-
-  async downloadImage(url: string): Promise<string> {
-    try {
-      const fileName = `clix_image_${Date.now()}`;
-      console.log(fileName);
-      const filePath = `${RNFS.CachesDirectoryPath}/${fileName}`;
-      console.log(filePath);
-      const result = await RNFS.downloadFile({
-        fromUrl: url,
-        toFile: filePath,
-      }).promise;
-      if (result.statusCode === 200) {
-        return `file://${filePath}`;
-      }
-    } catch (error) {
-      ClixLogger.warn('Failed to download image:', error);
-    }
-    throw new Error(`Failed to download image: ${url}`);
   }
 
   cleanup(): void {
@@ -470,15 +450,11 @@ export class NotificationService {
         );
         if (Platform.OS === 'ios') {
           try {
-            const url = await this.downloadImage(notificationContent.imageUrl);
-            if (url) {
-              config.ios.attachments = [
-                {
-                  url,
-                  typeHint: 'public.image',
-                },
-              ];
-            }
+            config.ios.attachments = [
+              {
+                url: notificationContent.imageUrl,
+              },
+            ];
           } catch (error) {
             ClixLogger.warn('Failed to download image attachment:', error);
           }
