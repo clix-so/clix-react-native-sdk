@@ -4,28 +4,38 @@ Clix React Native SDK is a powerful tool for managing push notifications and use
 
 ## Installation
 
-Add this to your package's `package.json` file:
-```sh
+### 1. Install the SDK
+
+```bash
 npm install @clix-so/react-native-sdk
 ```
 
 Or using Yarn:
-
-```sh
+```bash
 yarn add @clix-so/react-native-sdk
 ```
 
-## Requirements
+### 2. Install Required Dependencies
 
-- React Native 0.60.0 or later
-- iOS 14.0+ / Android API 21+
-- TypeScript 4.0+ (optional but recommended)
+You must install all required peer dependencies:
 
-## Dependency Version Compatibility
+```bash
+npm install @notifee/react-native @react-native-firebase/app @react-native-firebase/messaging react-native-device-info react-native-get-random-values react-native-mmkv uuid
+```
 
-### react-native-mmkv Version Selection (Critical)
+Or using Yarn:
+```bash
+yarn add @notifee/react-native @react-native-firebase/app @react-native-firebase/messaging react-native-device-info react-native-get-random-values react-native-mmkv uuid
+```
 
-**react-native-mmkv** has different versions based on React Native version and architecture:
+Or using Expo:
+```bash
+npx expo install @notifee/react-native @react-native-firebase/app @react-native-firebase/messaging react-native-device-info react-native-get-random-values react-native-mmkv uuid
+```
+
+### 3. Version Compatibility
+
+**react-native-mmkv Version Selection (Critical)**
 
 | React Native Version | Architecture | react-native-mmkv Version |
 |---------------------|-------------|---------------------------|
@@ -34,27 +44,17 @@ yarn add @clix-so/react-native-sdk
 
 ⚠️ **New Architecture Requirement**: react-native-mmkv v3.x requires React Native's New Architecture (TurboModules) to be enabled.
 
-### Install Peer Dependencies
-
-You must install all required peer dependencies alongside this SDK:
-
-```bash
-npm install @notifee/react-native @react-native-firebase/app @react-native-firebase/messaging react-native-device-info react-native-get-random-values react-native-mmkv uuid
+**Important Setup Note**: uuid requires react-native-get-random-values polyfill:
+```javascript
+import 'react-native-get-random-values'; // Must be imported first
+import { v4 as uuidv4 } from 'uuid';
 ```
 
-Or using Yarn:
+## Requirements
 
-```bash
-yarn add @notifee/react-native @react-native-firebase/app @react-native-firebase/messaging react-native-device-info react-native-get-random-values react-native-mmkv uuid
-```
-
-Or using Expo:
-
-```bash
-npx expo install @notifee/react-native @react-native-firebase/app @react-native-firebase/messaging react-native-device-info react-native-get-random-values react-native-mmkv uuid
-```
-
-**Note**: Use the appropriate react-native-mmkv version based on your React Native version (see compatibility table above).
+- React Native 0.60.0 or later
+- iOS 14.0+ / Android API 21+
+- TypeScript 4.0+ (optional but recommended)
 
 ## Usage
 
@@ -122,19 +122,8 @@ The Clix React Native SDK automatically handles push notification integration th
    - For iOS: Enable Push Notifications capability in Xcode
    - For Android: No additional setup required
 
-3. **Add required dependencies**
-
-```json
-"dependencies": {
-  "@notifee/react-native": "*",
-  "@react-native-firebase/app": "^19.3.0",
-  "@react-native-firebase/messaging": "^19.3.0",
-  "react-native-device-info": "*",
-  "react-native-get-random-values": "*",
-  "react-native-mmkv": "*",
-  "uuid": "*"
-}
-```
+3. **Firebase Configuration**
+   - Configure Firebase according to the installation steps above
 
 #### Background Message Handler Setup
 
