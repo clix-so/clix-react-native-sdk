@@ -1,0 +1,15 @@
+pluginManagement {
+    includeBuild("../node_modules/@react-native/gradle-plugin")
+}
+plugins {
+    id("com.facebook.react.settings")
+}
+extensions.configure(com.facebook.react.ReactSettingsExtension){ ex ->
+    ex.autolinkLibrariesFromCommand()
+}
+
+rootProject.name = 'ClixSample'
+include ':app'
+
+include ':clix_react-native-sdk'
+project(':clix_react-native-sdk').projectDir = new File(rootProject.projectDir, '../node_modules/@clix-so/react-native-sdk/android')
