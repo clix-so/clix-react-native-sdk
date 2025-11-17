@@ -203,7 +203,8 @@ rel_to_url() { printf "%s/%s" "$RAW_BASE" "$(url_encode_spaces "$1")"; }
 
 path_is_target() {
   local rel="$1"
-  local base="$(basename "$rel")"
+  local base
+  base="$(basename "$rel")"
   # Whitelist select top-level docs/configs regardless of EXTENSIONS/INCLUDE_DIRS
   case "$base" in
     README.md|CHANGELOG.md|LICENSE|package.json|tsconfig.json|tsconfig.build.json|babel.config.js|lefthook.yml) return 0 ;;
