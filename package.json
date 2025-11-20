@@ -50,11 +50,16 @@
     "@react-native-firebase/app": "*",
     "@react-native-firebase/messaging": "*",
     "react": "*",
-    "react-native": "*",
+    "react-native": ">=0.70.0",
     "react-native-device-info": "*",
     "react-native-get-random-values": "*",
-    "react-native-mmkv": "*",
+    "react-native-mmkv": "^2.12.2 || ^3.0.0 || ^4.0.0",
     "uuid": "*"
+  },
+  "peerDependenciesMeta": {
+    "react-native-mmkv": {
+      "optional": false
+    }
   },
   "devDependencies": {
     "@commitlint/config-conventional": "19.6.0",
@@ -81,7 +86,7 @@
     "react-native-builder-bob": "0.40.12",
     "react-native-device-info": "13.2.0",
     "react-native-get-random-values": "1.11.0",
-    "react-native-mmkv": "2.12.2",
+    "react-native-mmkv": "4.0.1",
     "release-it": "17.10.0",
     "typescript": "5.8.3",
     "uuid": "11.1.0"
