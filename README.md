@@ -37,12 +37,34 @@ npx expo install @notifee/react-native @react-native-firebase/app @react-native-
 
 **react-native-mmkv Version Selection (Critical)**
 
-| React Native Version | Architecture | react-native-mmkv Version |
-|---------------------|-------------|---------------------------|
-| **0.70-0.73** | Old Architecture | `^2.12.2` |
-| **0.74+** | New Architecture | `^3.0.1+` |
+This SDK supports multiple versions of react-native-mmkv to ensure compatibility across different React Native versions:
 
-⚠️ **New Architecture Requirement**: react-native-mmkv v3.x requires React Native's New Architecture (TurboModules) to be enabled.
+| React Native Version | Architecture | Recommended MMKV Version | Notes |
+|---------------------|-------------|--------------------------|-------|
+| **0.70-0.73** | Old Architecture | `^2.12.2` | Stable, well-tested |
+| **0.74+** | New Architecture | `^3.0.0` or `^4.0.0` | Requires TurboModules enabled |
+| **0.75+** | Old/New Architecture | `^4.0.0` | Full Nitro support |
+
+**Flexible Installation**: This SDK's `peerDependencies` allows `react-native-mmkv` versions `^2.12.2 || ^3.0.0 || ^4.0.0`, so you can choose the version that matches your React Native setup. The StorageService automatically detects and uses the correct API for your installed version.
+
+**Example installations:**
+```bash
+# For React Native 0.70-0.73 (Old Architecture)
+npm install react-native-mmkv@^2.12.2
+
+# For React Native 0.74+ (New Architecture)
+npm install react-native-mmkv@^3.0.0
+# or
+npm install react-native-mmkv@^4.0.0
+
+# For React Native 0.75+ (Recommended)
+npm install react-native-mmkv@^4.0.1
+```
+
+⚠️ **Important Notes**:
+- MMKV v3.x and v4.x (on RN 0.74) require React Native's New Architecture (TurboModules) to be enabled
+- MMKV v4.x on RN 0.75+ supports both architectures with Nitro
+- The SDK automatically detects which MMKV API version is available and uses the appropriate interface
 
 **Important Setup Note**: uuid requires react-native-get-random-values polyfill:
 ```javascript
