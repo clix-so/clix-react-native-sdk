@@ -66,6 +66,30 @@ npm install react-native-mmkv@^4.0.1
 - MMKV v4.x on RN 0.75+ supports both architectures with Nitro
 - The SDK automatically detects which MMKV API version is available and uses the appropriate interface
 
+**Additional Setup for MMKV v4.x**:
+
+When using MMKV v4.0.0 or higher, you must also install `react-native-nitro-modules`:
+
+```bash
+npm install react-native-nitro-modules
+# or
+yarn add react-native-nitro-modules
+```
+
+**iOS Pod Installation Troubleshooting**:
+
+If you encounter pod installation errors with MMKV v4.x, add the following line to your `ios/Podfile` after the `prepare_react_native_project!` line:
+
+```ruby
+platform :ios, min_ios_version_supported
+prepare_react_native_project!
+
+# Add this line for MMKV v4.x compatibility
+use_frameworks! :linkage => :static
+```
+
+This configures CocoaPods to use static frameworks, which resolves compatibility issues with Nitro modules. For more details, see the [MMKV V4 Troubleshooting Guide](https://github.com/mrousavy/react-native-mmkv/blob/main/docs/V4_UPGRADE_GUIDE.md#troubleshooting).
+
 **Important Setup Note**: uuid requires react-native-get-random-values polyfill:
 ```javascript
 import 'react-native-get-random-values'; // Must be imported first
