@@ -1,20 +1,49 @@
-import { MMKV } from 'react-native-mmkv';
 import { ClixLogger } from '../utils/logging/ClixLogger';
 
+// Support both v2/v3 (MMKV class) and v4 (createMMKV function)
+type MMKVInstance = {
+  set: (key: string, value: string | number | boolean) => void;
+  getString: (key: string) => string | undefined;
+  delete?: (key: string) => void; // v2/v3
+  remove?: (key: string) => void; // v4
+  clearAll: () => void;
+  getAllKeys: () => string[];
+};
+
 export class StorageService {
-  private storage: MMKV;
+  private storage: MMKVInstance;
 
   constructor() {
-    this.storage = new MMKV({
-      id: 'clix-storage',
-      encryptionKey: undefined, // Add encryption if needed
-    });
+    try {
+      // Try v4 API first (createMMKV)
+      const { createMMKV } = require('react-native-mmkv');
+      this.storage = createMMKV({
+        id: 'clix-storage',
+        encryptionKey: undefined, // Add encryption if needed
+      });
+      ClixLogger.debug('Initialized MMKV storage using v4 API (createMMKV)');
+    } catch (error) {
+      // Fall back to v2/v3 API (MMKV class)
+      try {
+        const { MMKV } = require('react-native-mmkv');
+        this.storage = new MMKV({
+          id: 'clix-storage',
+          encryptionKey: undefined, // Add encryption if needed
+        });
+        ClixLogger.debug(
+          'Initialized MMKV storage using v2/v3 API (MMKV class)'
+        );
+      } catch (fallbackError) {
+        ClixLogger.error('Failed to initialize MMKV storage', fallbackError);
+        throw fallbackError;
+      }
+    }
   }
 
   async set<T>(key: string, value: T): Promise<void> {
     if (value === undefined) {
       try {
-        this.storage.delete(key);
+        this.deleteKey(key);
       } catch (error) {
         ClixLogger.error(`Failed to remove value for key: ${key}`, error);
       }
@@ -53,9 +82,21 @@ export class StorageService {
     }
   }
 
+  /**
+   * Delete a key from storage (works with both v2/v3 and v4 APIs)
+   */
+  private deleteKey(key: string): void {
+    // v4 uses remove(), v2/v3 uses delete()
+    if (this.storage.remove) {
+      this.storage.remove(key);
+    } else if (this.storage.delete) {
+      this.storage.delete(key);
+    }
+  }
+
   async remove(key: string): Promise<void> {
     try {
-      this.storage.delete(key);
+      this.deleteKey(key);
     } catch (error) {
       ClixLogger.error(`Failed to remove key: ${key}`, error);
       // Don't throw to prevent initialization failure
