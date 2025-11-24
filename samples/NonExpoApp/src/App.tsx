@@ -258,23 +258,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
-  notificationSection: {
-    marginTop: 30,
-    paddingTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#333',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    marginBottom: 20,
-  },
-  actionButton: {
-    backgroundColor: '#666',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
 });
 
 export default App;
