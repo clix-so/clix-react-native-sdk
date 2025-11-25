@@ -1,6 +1,7 @@
+import * as MMKVModule from 'react-native-mmkv';
 import { ClixLogger } from '../utils/logging/ClixLogger';
 
-// Support both v2/v3 (MMKV class) and v4 (createMMKV function)
+// // Support both v2/v3 (MMKV class) and v4 (createMMKV function)
 type MMKVInstance = {
   set: (key: string, value: string | number | boolean) => void;
   getString: (key: string) => string | undefined;
@@ -14,36 +15,47 @@ export class StorageService {
   private storage: MMKVInstance;
 
   constructor() {
-    try {
-      // Try v4 API first (createMMKV)
-      const { createMMKV } = require('react-native-mmkv');
-      this.storage = createMMKV({
+    this.storage = this.initializeCompat();
+  }
+
+  private initializeCompat() {
+    // v4 API (createMMKV function)
+    if (typeof MMKVModule.createMMKV === 'function') {
+      return MMKVModule.createMMKV({
         id: 'clix-storage',
         encryptionKey: undefined, // Add encryption if needed
       });
-      ClixLogger.debug('Initialized MMKV storage using v4 API (createMMKV)');
-    } catch (error) {
-      // Fall back to v2/v3 API (MMKV class)
-      try {
-        const { MMKV } = require('react-native-mmkv');
-        this.storage = new MMKV({
-          id: 'clix-storage',
-          encryptionKey: undefined, // Add encryption if needed
-        });
-        ClixLogger.debug(
-          'Initialized MMKV storage using v2/v3 API (MMKV class)'
-        );
-      } catch (fallbackError) {
-        ClixLogger.error('Failed to initialize MMKV storage', fallbackError);
-        throw fallbackError;
-      }
+    }
+    // v2/v3 API (MMKV class)
+    else if (typeof (MMKVModule as any).MMKV === 'function') {
+      const { MMKV } = MMKVModule as any;
+      return new MMKV({
+        id: 'clix-storage',
+        encryptionKey: undefined, // Add encryption if needed
+      });
+    } else {
+      throw new Error('No compatible MMKV storage API found');
     }
   }
 
-  async set<T>(key: string, value: T): Promise<void> {
-    if (value === undefined) {
+  /**
+   * Delete a key from storage (works with both v2/v3 and v4 APIs)
+   */
+  private removeCompat(key: string): void {
+    // v4 uses remove(), v2/v3 uses delete()
+    if (typeof this.storage.remove === 'function') {
+      this.storage.remove(key);
+    } else if (typeof this.storage.delete === 'function') {
+      this.storage.delete(key);
+    } else {
+      throw new Error('No compatible delete method found on storage instance');
+    }
+  }
+
+  set<T>(key: string, value: T): void {
+    if (value === undefined || value === null) {
       try {
-        this.deleteKey(key);
+        this.removeCompat(key);
       } catch (error) {
         ClixLogger.error(`Failed to remove value for key: ${key}`, error);
       }
@@ -60,10 +72,11 @@ export class StorageService {
     }
   }
 
-  async get<T>(key: string): Promise<T | undefined> {
+  get<T>(key: string): T | undefined {
     try {
       const data = this.storage.getString(key);
       if (data === null || data === undefined) return undefined;
+
       try {
         const decoded = JSON.parse(data);
         return decoded as T;
@@ -72,7 +85,7 @@ export class StorageService {
         ClixLogger.debug(
           `Found legacy string value for key: ${key}, migrating to JSON format`
         );
-        await this.set(key, data);
+        this.set(key, data);
         return data as T;
       }
     } catch (error) {
@@ -82,21 +95,9 @@ export class StorageService {
     }
   }
 
-  /**
-   * Delete a key from storage (works with both v2/v3 and v4 APIs)
-   */
-  private deleteKey(key: string): void {
-    // v4 uses remove(), v2/v3 uses delete()
-    if (this.storage.remove) {
-      this.storage.remove(key);
-    } else if (this.storage.delete) {
-      this.storage.delete(key);
-    }
-  }
-
-  async remove(key: string): Promise<void> {
+  remove(key: string) {
     try {
-      this.deleteKey(key);
+      this.removeCompat(key);
     } catch (error) {
       ClixLogger.error(`Failed to remove key: ${key}`, error);
       // Don't throw to prevent initialization failure
@@ -104,7 +105,7 @@ export class StorageService {
     }
   }
 
-  async clear(): Promise<void> {
+  clear() {
     try {
       this.storage.clearAll();
     } catch (error) {
@@ -113,7 +114,7 @@ export class StorageService {
     }
   }
 
-  async getAllKeys(): Promise<string[]> {
+  getAllKeys() {
     try {
       const keys = this.storage.getAllKeys();
       return Array.from(keys);

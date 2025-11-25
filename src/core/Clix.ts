@@ -207,9 +207,9 @@ export class Clix {
     this.storageService = new StorageService();
 
     try {
-      await this.storageService.set('project_id', config.projectId);
-      await this.storageService.set('api_key', config.apiKey);
-      await this.storageService.set('clix_config', {
+      this.storageService.set('project_id', config.projectId);
+      this.storageService.set('api_key', config.apiKey);
+      this.storageService.set('clix_config', {
         projectId: config.projectId,
         apiKey: config.apiKey,
         endpoint: config.endpoint,

@@ -233,7 +233,7 @@ export class NotificationService {
         return;
       }
 
-      await this.storageService.set('last_background_notification', {
+      this.storageService.set('last_background_notification', {
         messageId: remoteMessage.messageId,
         data: remoteMessage.data ?? {},
         timestamp: Date.now(),
@@ -295,7 +295,7 @@ export class NotificationService {
       criticalAlert: false,
     });
     ClixLogger.debug('Push notification permission status:', settings);
-    await this.storageService.set(
+    this.storageService.set(
       'notification_permission_status',
       settings.toString()
     );
@@ -688,20 +688,18 @@ export class NotificationService {
     }
     try {
       const storageService = new StorageService();
-      const configData = await storageService.get<Record<string, any>>(
-        'clix_config'
-      );
+      const configData = storageService.get<Record<string, any>>('clix_config');
       if (!configData) {
         ClixLogger.error('No Clix config found in storage');
         return;
       }
-      let deviceId = await storageService.get<string>('clix_device_id');
+      let deviceId = storageService.get<string>('clix_device_id');
       if (!deviceId) {
         ClixLogger.warn(
           'No device ID found in storage, generating new device ID'
         );
         deviceId = UUID.generate();
-        await storageService.set('clix_device_id', deviceId);
+        storageService.set('clix_device_id', deviceId);
       }
       const config = configData as ClixConfig;
       const apiClient = new ClixAPIClient(config);
