@@ -341,13 +341,13 @@ export class NotificationService {
 
   private async getOrFetchToken(): Promise<string | null> {
     if (this.tokenService) {
-      const savedToken = await this.tokenService.getCurrentToken();
+      const savedToken = this.tokenService.getCurrentToken();
       if (savedToken) return savedToken;
     }
     const token = await this.messagingService.getToken();
     if (token) {
       ClixLogger.debug('Got push token:', token.substring(0, 20) + '...');
-      await this.tokenService?.saveToken(token);
+      this.tokenService?.saveToken(token);
     }
     return token;
   }
