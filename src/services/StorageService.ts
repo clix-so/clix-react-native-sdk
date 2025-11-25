@@ -14,15 +14,17 @@ type MMKVInstance = {
 export class StorageService {
   private storage: MMKVInstance;
 
-  constructor() {
-    this.storage = this.initializeCompat();
+  constructor(projectId: string) {
+    this.storage = this.initializeCompat(projectId);
   }
 
-  private initializeCompat() {
+  private initializeCompat(projectId: string) {
+    const storageId = `clix.${projectId}`;
+
     // v4 API (createMMKV function)
     if (typeof MMKVModule.createMMKV === 'function') {
       return MMKVModule.createMMKV({
-        id: 'clix-storage',
+        id: storageId,
         encryptionKey: undefined, // Add encryption if needed
       });
     }
@@ -30,7 +32,7 @@ export class StorageService {
     else if (typeof (MMKVModule as any).MMKV === 'function') {
       const { MMKV } = MMKVModule as any;
       return new MMKV({
-        id: 'clix-storage',
+        id: storageId,
         encryptionKey: undefined, // Add encryption if needed
       });
     } else {

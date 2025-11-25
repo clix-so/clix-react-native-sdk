@@ -50,7 +50,7 @@
     "@react-native-firebase/app": "*",
     "@react-native-firebase/messaging": "*",
     "react": "*",
-    "react-native": ">=0.70.0",
+    "react-native": "*",
     "react-native-device-info": "*",
     "react-native-get-random-values": "*",
     "react-native-mmkv": "*",

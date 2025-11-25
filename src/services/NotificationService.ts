@@ -9,14 +9,10 @@ import messaging, {
   FirebaseMessagingTypes,
 } from '@react-native-firebase/messaging';
 import { Linking, Platform } from 'react-native';
-import type { ClixConfig } from '../core/ClixConfig';
 import { ClixPushNotificationPayload } from '../models/ClixPushNotificationPayload';
 import { ClixLogger } from '../utils/logging/ClixLogger';
 import { UUID } from '../utils/UUID';
-import { ClixAPIClient } from './ClixAPIClient';
-import { DeviceAPIService } from './DeviceAPIService';
 import { DeviceService } from './DeviceService';
-import { EventAPIService } from './EventAPIService';
 import { EventService } from './EventService';
 import { StorageService } from './StorageService';
 import { TokenService } from './TokenService';
@@ -687,33 +683,23 @@ export class NotificationService {
       return;
     }
     try {
-      const storageService = new StorageService();
-      const configData = storageService.get<Record<string, any>>('clix_config');
+      const configData =
+        this.storageService.get<Record<string, any>>('clix_config');
       if (!configData) {
         ClixLogger.error('No Clix config found in storage');
         return;
       }
-      let deviceId = storageService.get<string>('clix_device_id');
+      let deviceId = this.storageService.get<string>('clix_device_id');
       if (!deviceId) {
         ClixLogger.warn(
           'No device ID found in storage, generating new device ID'
         );
         deviceId = UUID.generate();
-        storageService.set('clix_device_id', deviceId);
+        this.storageService.set('clix_device_id', deviceId);
       }
-      const config = configData as ClixConfig;
-      const apiClient = new ClixAPIClient(config);
-      const deviceAPIService = new DeviceAPIService(apiClient);
-      const eventAPIService = new EventAPIService(apiClient);
-      const tokenService = new TokenService(storageService);
-      const deviceService = new DeviceService(
-        storageService,
-        tokenService,
-        deviceAPIService
-      );
-      const eventService = new EventService(eventAPIService, deviceService);
+
       const properties = this.extractTrackingProperties(clixPayload);
-      await eventService.trackEvent(
+      await this.eventService.trackEvent(
         'PUSH_NOTIFICATION_RECEIVED',
         properties,
         messageId

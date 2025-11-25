@@ -204,7 +204,7 @@ export class Clix {
    * Set configuration
    */
   private async setConfig(config: ClixConfig): Promise<void> {
-    this.storageService = new StorageService();
+    this.storageService = new StorageService(config.projectId);
 
     try {
       this.storageService.set('project_id', config.projectId);
