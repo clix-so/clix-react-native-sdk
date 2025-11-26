@@ -24,26 +24,12 @@ export class EventService {
       const cleanProperties: Record<string, any> = {};
       if (properties) {
         Object.entries(properties).forEach(([key, value]) => {
-          if (value === null || value === undefined) {
-            cleanProperties[key] = value;
-            return;
-          }
-
           if (value instanceof Date) {
             cleanProperties[key] = ClixDateFormatter.format(value);
             return;
           }
 
-          if (
-            typeof value === 'string' ||
-            typeof value === 'boolean' ||
-            typeof value === 'number'
-          ) {
-            cleanProperties[key] = value;
-            return;
-          }
-
-          cleanProperties[key] = String(value);
+          cleanProperties[key] = value;
         });
       }
 
