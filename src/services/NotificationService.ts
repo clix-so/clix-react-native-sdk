@@ -354,7 +354,7 @@ export class NotificationService {
 
   private async saveAndRegisterToken(token: string): Promise<void> {
     if (this.tokenService) {
-      await this.tokenService.saveToken(token);
+      this.tokenService.saveToken(token);
       ClixLogger.debug('New push token saved via TokenService');
     }
     await this.registerTokenWithServer(token);
