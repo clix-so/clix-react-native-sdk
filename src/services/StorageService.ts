@@ -1,7 +1,7 @@
 import * as MMKVModule from 'react-native-mmkv';
 import { ClixLogger } from '../utils/logging/ClixLogger';
 
-// // Support both v2/v3 (MMKV class) and v4 (createMMKV function)
+// Support both v2/v3 (MMKV class) and v4 (createMMKV function)
 type MMKVInstance = {
   set: (key: string, value: string | number | boolean) => void;
   getString: (key: string) => string | undefined;
