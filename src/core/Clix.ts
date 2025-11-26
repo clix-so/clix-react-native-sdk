@@ -153,7 +153,7 @@ export class Clix {
   }
 
   /**
-   * Get push token
+   * @deprecated Use Clix.Notification.getToken() instead.
    */
   static async getPushToken(): Promise<string | undefined> {
     try {
