@@ -179,21 +179,14 @@ export class Clix {
   /**
    * Track event
    */
-  protected static async trackEvent(
+  static async trackEvent(
     name: string,
-    options?: {
-      properties?: Record<string, any>;
-      messageId?: string;
-    }
+    properties: Record<string, any> = {}
   ): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
       if (this.shared?.eventService) {
-        await this.shared.eventService.trackEvent(
-          name,
-          options?.properties,
-          options?.messageId
-        );
+        await this.shared.eventService.trackEvent(name, properties);
       }
     } catch (error) {
       ClixLogger.error(`Failed to track event: ${error}`);
