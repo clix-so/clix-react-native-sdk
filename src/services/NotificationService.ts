@@ -24,6 +24,19 @@ interface NotificationContent {
   imageUrl?: string;
 }
 
+type NotificationData = Record<string, any>;
+
+export type ForegroundMessageHandler = (
+  data: NotificationData
+) => Promise<boolean> | boolean;
+export type BackgroundMessageHandler = (
+  data: NotificationData
+) => Promise<void> | void;
+export type NotificationOpenedHandler = (
+  data: NotificationData
+) => Promise<void> | void;
+export type FcmTokenErrorHandler = (error: Error) => Promise<void> | void;
+
 export class NotificationService {
   private static instance: NotificationService | null = null;
 
@@ -46,6 +59,12 @@ export class NotificationService {
   private storageService!: StorageService;
   private deviceService?: DeviceService;
   private tokenService?: TokenService;
+
+  private autoHandleLandingUrl = true;
+  private messageHandler?: ForegroundMessageHandler;
+  private backgroundMessageHandler?: BackgroundMessageHandler;
+  private openedHandler?: NotificationOpenedHandler;
+  private fcmTokenErrorHandler?: FcmTokenErrorHandler;
 
   private unsubscribeForegroundMessage?: () => void;
   private unsubscribeNotificationOpened?: () => void;
@@ -107,6 +126,7 @@ export class NotificationService {
       return this.currentPushToken;
     } catch (error) {
       ClixLogger.error('Failed to get push token', error);
+      await this.handleFcmTokenError(error);
       return null;
     }
   }
@@ -119,6 +139,26 @@ export class NotificationService {
     this.isInitialized = false;
     this.processedMessageIds.clear();
     ClixLogger.debug('Notification service cleaned up');
+  }
+
+  setMessageHandler(handler?: ForegroundMessageHandler): void {
+    this.messageHandler = handler;
+  }
+
+  setBackgroundMessageHandler(handler?: BackgroundMessageHandler): void {
+    this.backgroundMessageHandler = handler;
+  }
+
+  setNotificationOpenedHandler(handler?: NotificationOpenedHandler): void {
+    this.openedHandler = handler;
+  }
+
+  setFcmTokenErrorHandler(handler?: FcmTokenErrorHandler): void {
+    this.fcmTokenErrorHandler = handler;
+  }
+
+  setAutoHandleLandingUrl(enable: boolean): void {
+    this.autoHandleLandingUrl = enable;
   }
 
   private async initializeNotificationDisplayService(): Promise<void> {
@@ -211,8 +251,15 @@ export class NotificationService {
   ): Promise<void> {
     ClixLogger.debug('Handling background message:', remoteMessage.messageId);
 
+    const data = remoteMessage.data ?? {};
     try {
-      const clixPayload = this.parseClixPayload(remoteMessage.data ?? {});
+      await this.backgroundMessageHandler?.(data);
+    } catch (error) {
+      ClixLogger.warn('Background message handler failed', error);
+    }
+
+    try {
+      const clixPayload = this.parseClixPayload(data);
       if (!clixPayload) {
         ClixLogger.warn('No Clix payload found in background message');
         return;
@@ -220,7 +267,7 @@ export class NotificationService {
 
       this.storageService.set('last_background_notification', {
         messageId: remoteMessage.messageId,
-        data: remoteMessage.data ?? {},
+        data: data,
         timestamp: Date.now(),
         clixMessageId: clixPayload.messageId,
         campaignId: clixPayload.campaignId,
@@ -257,15 +304,24 @@ export class NotificationService {
         return;
       }
 
-      const clixPayload = this.parseClixPayload(remoteMessage.data ?? {});
+      const data = remoteMessage.data ?? {};
+      const clixPayload = this.parseClixPayload(data);
       if (clixPayload) {
         ClixLogger.debug('Parsed Clix payload:', clixPayload);
         this.processedMessageIds.add(messageId);
         if (Platform.OS === 'android') {
           // NOTE(nyanxyz): on iOS, Received event is tracked in NSE
-          await this.handlePushReceived(remoteMessage.data ?? {});
+          await this.handlePushReceived(data);
         }
-        await this.displayNotification(remoteMessage, clixPayload);
+
+        if (await this.shouldDisplayForegroundNotification(data)) {
+          await this.displayNotification(remoteMessage, clixPayload);
+        } else {
+          ClixLogger.debug(
+            'Foreground message suppressed by user handler:',
+            messageId
+          );
+        }
       } else {
         ClixLogger.warn('No Clix payload found in foreground message');
       }
@@ -300,6 +356,7 @@ export class NotificationService {
           await this.saveAndRegisterToken(token);
         } catch (error) {
           ClixLogger.error('Failed to handle token refresh', error);
+          await this.handleFcmTokenError(error);
         }
       }
     );
@@ -554,7 +611,9 @@ export class NotificationService {
       if (clixPayload) {
         await this.trackPushEvent('PUSH_NOTIFICATION_TAPPED', clixPayload);
       }
-      await this.handleUrlNavigation(data);
+      if (this.autoHandleLandingUrl) {
+        await this.handleUrlNavigation(data);
+      }
       ClixLogger.debug('Push notification tapped and processed');
     } catch (error) {
       ClixLogger.error('Failed to handle push tapped', error);
@@ -564,6 +623,12 @@ export class NotificationService {
   private async handleNotificationTap(
     data: Record<string, any>
   ): Promise<void> {
+    try {
+      await this.openedHandler?.(data);
+    } catch (error) {
+      ClixLogger.error('Failed to handle notification tap', error);
+    }
+
     try {
       await this.handlePushTapped(data);
     } catch (error) {
@@ -702,6 +767,31 @@ export class NotificationService {
       );
     } catch (error) {
       ClixLogger.error('Error tracking event in background', error);
+    }
+  }
+
+  private async shouldDisplayForegroundNotification(
+    data: Record<string, any>
+  ): Promise<boolean> {
+    try {
+      const result = await this.messageHandler?.(data);
+      return result !== false;
+    } catch (error) {
+      ClixLogger.warn(
+        'Foreground message handler failed, displaying notification by default',
+        error
+      );
+      return true;
+    }
+  }
+
+  private async handleFcmTokenError(error: any): Promise<void> {
+    try {
+      const errorInstance =
+        error instanceof Error ? error : new Error(String(error));
+      await this.fcmTokenErrorHandler?.(errorInstance);
+    } catch (handlerError) {
+      ClixLogger.warn('FCM token error handler failed', handlerError);
     }
   }
 }
