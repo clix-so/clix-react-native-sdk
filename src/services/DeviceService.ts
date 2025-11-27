@@ -102,7 +102,7 @@ export class DeviceService {
 
   async upsertToken(token: string, tokenType: string = 'FCM'): Promise<void> {
     try {
-      await this.tokenService.saveToken(token);
+      this.tokenService.saveToken(token);
 
       const deviceId = this.getCurrentDeviceId();
       const device = await this.createDevice(deviceId, token);
@@ -134,15 +134,6 @@ export class DeviceService {
 
   private async getPushPermissionStatus(): Promise<boolean> {
     try {
-      // First check stored permission status
-      const storedStatus = this.storageService.get<string>(
-        'notification_permission_status'
-      );
-      if (storedStatus === 'authorized' || storedStatus === 'provisional') {
-        return true;
-      }
-
-      // If no stored status, check current Firebase messaging permission
       const authStatus = await messaging().hasPermission();
       const isGranted =
         authStatus === messaging.AuthorizationStatus.AUTHORIZED ||

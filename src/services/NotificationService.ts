@@ -4,6 +4,7 @@ import notifee, {
   EventType,
   type AndroidChannel,
   type Event,
+  type NotificationSettings,
 } from '@notifee/react-native';
 import messaging, {
   FirebaseMessagingTypes,
@@ -121,15 +122,6 @@ export class NotificationService {
   }
 
   private async initializeNotificationDisplayService(): Promise<void> {
-    await notifee.requestPermission({
-      alert: true,
-      badge: true,
-      sound: true,
-      criticalAlert: false,
-      announcement: false,
-      carPlay: false,
-      provisional: false,
-    });
     if (Platform.OS === 'android') {
       await this.createNotificationChannels();
     }
@@ -190,13 +182,8 @@ export class NotificationService {
 
   private async initializeMessageService(): Promise<void> {
     this.setupMessageHandlers();
-    const settings = await this.requestMessagePermission();
-    if (settings !== messaging.AuthorizationStatus.DENIED) {
-      await this.getAndUpdateToken();
-      this.setupTokenRefreshListener();
-    } else {
-      ClixLogger.warn('Push notification permission denied');
-    }
+    await this.getAndUpdateToken();
+    this.setupTokenRefreshListener();
   }
 
   private setupMessageHandlers(): void {
@@ -222,6 +209,8 @@ export class NotificationService {
   private async handleBackgroundMessage(
     remoteMessage: FirebaseMessagingTypes.RemoteMessage
   ): Promise<void> {
+    ClixLogger.debug('Handling background message:', remoteMessage.messageId);
+
     try {
       const clixPayload = this.parseClixPayload(remoteMessage.data ?? {});
       if (!clixPayload) {
@@ -251,6 +240,8 @@ export class NotificationService {
   private async handleForegroundMessage(
     remoteMessage: FirebaseMessagingTypes.RemoteMessage
   ): Promise<void> {
+    ClixLogger.debug('Handling foreground message:', remoteMessage.messageId);
+
     try {
       const messageId = remoteMessage.messageId;
       if (!messageId) {
@@ -270,7 +261,10 @@ export class NotificationService {
       if (clixPayload) {
         ClixLogger.debug('Parsed Clix payload:', clixPayload);
         this.processedMessageIds.add(messageId);
-        await this.handlePushReceived(remoteMessage.data ?? {});
+        if (Platform.OS === 'android') {
+          // NOTE(nyanxyz): on iOS, Received event is tracked in NSE
+          await this.handlePushReceived(remoteMessage.data ?? {});
+        }
         await this.displayNotification(remoteMessage, clixPayload);
       } else {
         ClixLogger.warn('No Clix payload found in foreground message');
@@ -280,8 +274,8 @@ export class NotificationService {
     }
   }
 
-  private async requestMessagePermission(): Promise<any> {
-    const settings = await this.messagingService.requestPermission({
+  async requestPermission(): Promise<NotificationSettings> {
+    const settings = await notifee.requestPermission({
       alert: true,
       badge: true,
       sound: true,
@@ -291,10 +285,9 @@ export class NotificationService {
       criticalAlert: false,
     });
     ClixLogger.debug('Push notification permission status:', settings);
-    this.storageService.set(
-      'notification_permission_status',
-      settings.toString()
-    );
+
+    // TODO(nyanxyz): Upsert device.is_push_permission_granted to server
+
     return settings;
   }
 

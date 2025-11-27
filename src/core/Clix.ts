@@ -12,13 +12,13 @@ import type { ClixConfig } from './ClixConfig';
 import { ClixInitCoordinator } from './ClixInitCoordinator';
 
 export class Clix {
-  private static shared?: Clix;
-  private static initCoordinator = new ClixInitCoordinator();
+  static shared?: Clix;
+  static initCoordinator = new ClixInitCoordinator();
 
-  protected storageService?: StorageService;
-  protected eventService?: EventService;
-  protected deviceService?: DeviceService;
-  protected notificationService?: NotificationService;
+  storageService?: StorageService;
+  eventService?: EventService;
+  deviceService?: DeviceService;
+  notificationService?: NotificationService;
 
   private constructor() {}
 
