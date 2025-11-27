@@ -64,6 +64,24 @@ export class ClixNotification {
     }
   }
 
+  async setPermissionGranted(isGranted: boolean): Promise<void> {
+    try {
+      await Clix.initCoordinator.waitForInitialization();
+      const notificationService = Clix.shared?.notificationService;
+      if (!notificationService) {
+        ClixLogger.warn('Notification service is not initialized');
+        return;
+      }
+
+      await notificationService.setPermissionGranted(isGranted);
+    } catch (error) {
+      ClixLogger.error(
+        'Failed to update push permission status on server',
+        error
+      );
+    }
+  }
+
   async getToken(): Promise<string | undefined> {
     try {
       await Clix.initCoordinator.waitForInitialization();

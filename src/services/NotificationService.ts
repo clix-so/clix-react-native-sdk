@@ -1,6 +1,7 @@
 import notifee, {
   AndroidImportance,
   AndroidStyle,
+  AuthorizationStatus,
   EventType,
   type AndroidChannel,
   type Event,
@@ -342,9 +343,32 @@ export class NotificationService {
     });
     ClixLogger.debug('Push notification permission status:', settings);
 
-    // TODO(nyanxyz): Upsert device.is_push_permission_granted to server
+    const isGranted =
+      settings.authorizationStatus === AuthorizationStatus.AUTHORIZED ||
+      settings.authorizationStatus === AuthorizationStatus.PROVISIONAL;
+    await this.setPermissionGranted(isGranted);
 
     return settings;
+  }
+
+  async setPermissionGranted(isGranted: boolean): Promise<void> {
+    if (!this.deviceService) {
+      ClixLogger.debug(
+        'Device service is not initialized, skipping push permission upsert'
+      );
+      return;
+    }
+
+    try {
+      await this.deviceService.upsertIsPushPermissionGranted(isGranted);
+      ClixLogger.debug(
+        `Push permission status reported to server: ${
+          isGranted ? 'granted' : 'denied'
+        }`
+      );
+    } catch (error) {
+      ClixLogger.warn('Failed to upsert push permission status', error);
+    }
   }
 
   private setupTokenRefreshListener(): void {
