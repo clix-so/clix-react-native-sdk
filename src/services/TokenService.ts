@@ -8,20 +8,18 @@ export class TokenService {
 
   constructor(private readonly storageService: StorageService) {}
 
-  async getCurrentToken(): Promise<string | undefined> {
+  getCurrentToken(): string | undefined {
     try {
-      return await this.storageService.get<string>(
-        TokenService.CURRENT_TOKEN_KEY
-      );
+      return this.storageService.get<string>(TokenService.CURRENT_TOKEN_KEY);
     } catch (error) {
       ClixLogger.error('Failed to get current token', error);
       return undefined;
     }
   }
 
-  async getPreviousTokens(): Promise<string[]> {
+  getPreviousTokens(): string[] {
     try {
-      const result = await this.storageService.get<string[]>(
+      const result = this.storageService.get<string[]>(
         TokenService.PREVIOUS_TOKENS_KEY
       );
       if (result === undefined) return [];
@@ -33,11 +31,11 @@ export class TokenService {
     }
   }
 
-  async saveToken(token: string): Promise<void> {
+  saveToken(token: string) {
     try {
-      await this.storageService.set(TokenService.CURRENT_TOKEN_KEY, token);
+      this.storageService.set(TokenService.CURRENT_TOKEN_KEY, token);
 
-      let tokens = await this.getPreviousTokens();
+      let tokens = this.getPreviousTokens();
 
       // Remove existing token if present
       const currentIndex = tokens.indexOf(token);
@@ -53,7 +51,7 @@ export class TokenService {
         tokens = tokens.slice(-TokenService.MAX_TOKENS);
       }
 
-      await this.storageService.set(TokenService.PREVIOUS_TOKENS_KEY, tokens);
+      this.storageService.set(TokenService.PREVIOUS_TOKENS_KEY, tokens);
       ClixLogger.debug('Token saved successfully');
     } catch (error) {
       ClixLogger.error('Failed to save token', error);
@@ -61,10 +59,10 @@ export class TokenService {
     }
   }
 
-  async clearTokens(): Promise<void> {
+  clearTokens() {
     try {
-      await this.storageService.remove(TokenService.PREVIOUS_TOKENS_KEY);
-      await this.storageService.remove(TokenService.CURRENT_TOKEN_KEY);
+      this.storageService.remove(TokenService.PREVIOUS_TOKENS_KEY);
+      this.storageService.remove(TokenService.CURRENT_TOKEN_KEY);
       ClixLogger.debug('All tokens cleared');
     } catch (error) {
       ClixLogger.error('Failed to clear tokens', error);
@@ -78,7 +76,7 @@ export class TokenService {
       .join('');
   }
 
-  async reset(): Promise<void> {
-    await this.clearTokens();
+  reset() {
+    this.clearTokens();
   }
 }

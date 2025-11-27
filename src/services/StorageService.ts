@@ -1,20 +1,63 @@
-import { MMKV } from 'react-native-mmkv';
+import * as MMKVModule from 'react-native-mmkv';
 import { ClixLogger } from '../utils/logging/ClixLogger';
 
-export class StorageService {
-  private storage: MMKV;
+// Support both v2/v3 (MMKV class) and v4 (createMMKV function)
+type MMKVInstance = {
+  set: (key: string, value: string | number | boolean) => void;
+  getString: (key: string) => string | undefined;
+  delete?: (key: string) => void; // v2/v3
+  remove?: (key: string) => void; // v4
+  clearAll: () => void;
+  getAllKeys: () => string[];
+};
 
-  constructor() {
-    this.storage = new MMKV({
-      id: 'clix-storage',
-      encryptionKey: undefined, // Add encryption if needed
-    });
+export class StorageService {
+  private storage: MMKVInstance;
+
+  constructor(projectId: string) {
+    this.storage = this.initializeCompat(projectId);
   }
 
-  async set<T>(key: string, value: T): Promise<void> {
-    if (value === undefined) {
+  private initializeCompat(projectId: string) {
+    const storageId = `clix.${projectId}`;
+
+    // v4 API (createMMKV function)
+    if (typeof MMKVModule.createMMKV === 'function') {
+      return MMKVModule.createMMKV({
+        id: storageId,
+        encryptionKey: undefined, // Add encryption if needed
+      });
+    }
+    // v2/v3 API (MMKV class)
+    else if (typeof (MMKVModule as any).MMKV === 'function') {
+      const { MMKV } = MMKVModule as any;
+      return new MMKV({
+        id: storageId,
+        encryptionKey: undefined, // Add encryption if needed
+      });
+    } else {
+      throw new Error('No compatible MMKV storage API found');
+    }
+  }
+
+  /**
+   * Delete a key from storage (works with both v2/v3 and v4 APIs)
+   */
+  private removeCompat(key: string): void {
+    // v4 uses remove(), v2/v3 uses delete()
+    if (typeof this.storage.remove === 'function') {
+      this.storage.remove(key);
+    } else if (typeof this.storage.delete === 'function') {
+      this.storage.delete(key);
+    } else {
+      throw new Error('No compatible delete method found on storage instance');
+    }
+  }
+
+  set<T>(key: string, value: T): void {
+    if (value === undefined || value === null) {
       try {
-        this.storage.delete(key);
+        this.removeCompat(key);
       } catch (error) {
         ClixLogger.error(`Failed to remove value for key: ${key}`, error);
       }
@@ -31,10 +74,11 @@ export class StorageService {
     }
   }
 
-  async get<T>(key: string): Promise<T | undefined> {
+  get<T>(key: string): T | undefined {
     try {
       const data = this.storage.getString(key);
       if (data === null || data === undefined) return undefined;
+
       try {
         const decoded = JSON.parse(data);
         return decoded as T;
@@ -43,7 +87,7 @@ export class StorageService {
         ClixLogger.debug(
           `Found legacy string value for key: ${key}, migrating to JSON format`
         );
-        await this.set(key, data);
+        this.set(key, data);
         return data as T;
       }
     } catch (error) {
@@ -53,9 +97,9 @@ export class StorageService {
     }
   }
 
-  async remove(key: string): Promise<void> {
+  remove(key: string) {
     try {
-      this.storage.delete(key);
+      this.removeCompat(key);
     } catch (error) {
       ClixLogger.error(`Failed to remove key: ${key}`, error);
       // Don't throw to prevent initialization failure
@@ -63,7 +107,7 @@ export class StorageService {
     }
   }
 
-  async clear(): Promise<void> {
+  clear() {
     try {
       this.storage.clearAll();
     } catch (error) {
@@ -72,7 +116,7 @@ export class StorageService {
     }
   }
 
-  async getAllKeys(): Promise<string[]> {
+  getAllKeys() {
     try {
       const keys = this.storage.getAllKeys();
       return Array.from(keys);

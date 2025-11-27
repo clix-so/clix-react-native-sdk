@@ -20,8 +20,8 @@ export class DeviceService {
     private readonly deviceAPIService: DeviceAPIService
   ) {}
 
-  async getCurrentDeviceId(): Promise<string> {
-    const existingId = await this.storageService.get<string>(
+  getCurrentDeviceId(): string {
+    const existingId = this.storageService.get<string>(
       DeviceService.DEVICE_ID_KEY
     );
     if (existingId) {
@@ -29,13 +29,13 @@ export class DeviceService {
     }
 
     const newId = UUID.generate();
-    await this.storageService.set(DeviceService.DEVICE_ID_KEY, newId);
+    this.storageService.set(DeviceService.DEVICE_ID_KEY, newId);
     return newId;
   }
 
   async setProjectUserId(projectUserId: string): Promise<void> {
     try {
-      const deviceId = await this.getCurrentDeviceId();
+      const deviceId = this.getCurrentDeviceId();
       await this.deviceAPIService.setProjectUserId(deviceId, projectUserId);
       ClixLogger.debug(`Project user ID set: ${projectUserId}`);
     } catch (error) {
@@ -49,7 +49,7 @@ export class DeviceService {
 
   async removeProjectUserId(): Promise<void> {
     try {
-      const deviceId = await this.getCurrentDeviceId();
+      const deviceId = this.getCurrentDeviceId();
       await this.deviceAPIService.removeProjectUserId(deviceId);
       ClixLogger.debug('Project user ID removed');
     } catch (error) {
@@ -67,7 +67,7 @@ export class DeviceService {
         ClixUserProperty.of(key, value)
       );
 
-      const deviceId = await this.getCurrentDeviceId();
+      const deviceId = this.getCurrentDeviceId();
       await this.deviceAPIService.upsertUserProperties(
         deviceId,
         userProperties
@@ -87,7 +87,7 @@ export class DeviceService {
 
   async removeUserProperties(names: string[]): Promise<void> {
     try {
-      const deviceId = await this.getCurrentDeviceId();
+      const deviceId = this.getCurrentDeviceId();
       await this.deviceAPIService.removeUserProperties(deviceId, names);
 
       ClixLogger.debug(`User properties removed: ${names.join(', ')}`);
@@ -104,7 +104,7 @@ export class DeviceService {
     try {
       await this.tokenService.saveToken(token);
 
-      const deviceId = await this.getCurrentDeviceId();
+      const deviceId = this.getCurrentDeviceId();
       const device = await this.createDevice(deviceId, token);
 
       await this.deviceAPIService.registerDevice(device);
@@ -135,7 +135,7 @@ export class DeviceService {
   private async getPushPermissionStatus(): Promise<boolean> {
     try {
       // First check stored permission status
-      const storedStatus = await this.storageService.get<string>(
+      const storedStatus = this.storageService.get<string>(
         'notification_permission_status'
       );
       if (storedStatus === 'authorized' || storedStatus === 'provisional') {
