@@ -10,10 +10,13 @@ import { ClixError } from '../utils/ClixError';
 import { ClixLogger, ClixLogLevel } from '../utils/logging/ClixLogger';
 import type { ClixConfig } from './ClixConfig';
 import { ClixInitCoordinator } from './ClixInitCoordinator';
+import { ClixNotification } from './ClixNotification';
 
 export class Clix {
   static shared?: Clix;
   static initCoordinator = new ClixInitCoordinator();
+
+  static Notification = ClixNotification.shared;
 
   storageService?: StorageService;
   eventService?: EventService;
@@ -36,6 +39,8 @@ export class Clix {
 
       this.shared = new Clix();
       await this.shared.setConfig(config);
+
+      ClixNotification.initialize();
 
       ClixLogger.debug('Clix SDK initialized successfully');
       this.initCoordinator.completeInitialization();
