@@ -1,3 +1,4 @@
+import { type NotificationSettings } from '@notifee/react-native';
 import type {
   BackgroundMessageHandler,
   FcmTokenErrorHandler,
@@ -44,6 +45,22 @@ export class ClixNotification {
       }
     } catch (error) {
       ClixLogger.error('Failed to configure notifications', error);
+    }
+  }
+
+  async requestPermission(): Promise<NotificationSettings | null> {
+    try {
+      await Clix.initCoordinator.waitForInitialization();
+      const notificationService = Clix.shared?.notificationService;
+      if (!notificationService) {
+        ClixLogger.warn('Notification service is not initialized');
+        return null;
+      }
+
+      return await notificationService.requestPermission();
+    } catch (error) {
+      ClixLogger.error('Failed to request notification permission', error);
+      return null;
     }
   }
 
