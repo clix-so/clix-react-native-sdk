@@ -64,6 +64,23 @@ export class ClixNotification {
     }
   }
 
+  async getToken(): Promise<string | undefined> {
+    try {
+      await Clix.initCoordinator.waitForInitialization();
+      const notificationService = Clix.shared?.notificationService;
+      if (!notificationService) {
+        ClixLogger.warn('Notification service is not initialized');
+        return undefined;
+      }
+
+      const token = await notificationService.getCurrentToken();
+      return token ?? undefined;
+    } catch (error) {
+      ClixLogger.error('Failed to get push token', error);
+      return undefined;
+    }
+  }
+
   async onMessage(handler?: ForegroundMessageHandler): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
