@@ -32,12 +32,17 @@ target 'ClixSample' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
-    
+
     # Fix deployment target warnings
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |config|
-        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.0'
       end
     end
   end
+end
+
+target 'ClixNotificationExtension' do
+  use_frameworks! :linkage => :static
+  pod 'Clix', :path => File.expand_path("~/Developer/clix-ios-sdk", __dir__)
 end
