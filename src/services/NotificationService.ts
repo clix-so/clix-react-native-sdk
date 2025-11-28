@@ -418,7 +418,10 @@ export class NotificationService {
       const savedToken = this.tokenService.getCurrentToken();
       if (savedToken) return savedToken;
     }
+
+    await this.messagingService.registerDeviceForRemoteMessages();
     const token = await this.messagingService.getToken();
+
     if (token) {
       ClixLogger.debug('Got push token:', token.substring(0, 20) + '...');
       this.tokenService?.saveToken(token);
