@@ -20,11 +20,7 @@ interface ConfigureOptions {
 }
 
 export class ClixNotification {
-  static shared?: ClixNotification;
-
-  static initialize() {
-    this.shared = new ClixNotification();
-  }
+  static shared: ClixNotification = new ClixNotification();
 
   async configure(options: ConfigureOptions = {}) {
     const { autoRequestPermission = false, autoHandleLandingURL = true } =

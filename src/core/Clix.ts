@@ -40,8 +40,6 @@ export class Clix {
       this.shared = new Clix();
       await this.shared.setConfig(config);
 
-      ClixNotification.initialize();
-
       ClixLogger.debug('Clix SDK initialized successfully');
       this.initCoordinator.completeInitialization();
     } catch (error) {

@@ -35,34 +35,29 @@ function App() {
   useEffect(() => {
     const initialize = async () => {
       try {
-        try {
-          const currentDeviceId = await Clix.getDeviceId();
-          const currentPushToken = await Clix.getPushToken();
-          setDeviceId(currentDeviceId || null);
-          setPushToken(currentPushToken || null);
-        } catch (deviceError) {
-          console.warn(
-            'Failed to get device info immediately after init:',
-            deviceError
-          );
-          setDeviceId('Loading...');
-          setPushToken('Loading...');
-          setTimeout(async () => {
-            try {
-              const currentDeviceId = await Clix.getDeviceId();
-              const currentPushToken = await Clix.getPushToken();
-              setDeviceId(currentDeviceId || null);
-              setPushToken(currentPushToken || null);
-            } catch (retryError) {
-              console.error('Failed to get device info on retry:', retryError);
-              setDeviceId('Error loading');
-              setPushToken('Error loading');
-            }
-          }, 1000);
-        }
-      } catch (error) {
-        console.error('Failed to initialize Clix SDK:', error);
-        Alert.alert('Error', `Failed to initialize Clix SDK: ${error}`);
+        const currentDeviceId = await Clix.getDeviceId();
+        const currentPushToken = await Clix.Notification.getToken();
+        setDeviceId(currentDeviceId || null);
+        setPushToken(currentPushToken || null);
+      } catch (deviceError) {
+        console.warn(
+          'Failed to get device info immediately after init:',
+          deviceError
+        );
+        setDeviceId('Loading...');
+        setPushToken('Loading...');
+        setTimeout(async () => {
+          try {
+            const currentDeviceId = await Clix.getDeviceId();
+            const currentPushToken = await Clix.Notification.getToken();
+            setDeviceId(currentDeviceId || null);
+            setPushToken(currentPushToken || null);
+          } catch (retryError) {
+            console.error('Failed to get device info on retry:', retryError);
+            setDeviceId('Error loading');
+            setPushToken('Error loading');
+          }
+        }, 1000);
       }
     };
     initialize();
