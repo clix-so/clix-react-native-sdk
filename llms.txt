@@ -1,7 +1,7 @@
 <!-- repo: clix-so/clix-react-native-sdk -->
 <!-- ref: main -->
-<!-- commit: 7a91757140d3ec99cb4e260733c9b0f36cce4987 -->
-<!-- generated_at: 2025-11-17T09:31:41Z -->
+<!-- commit: main -->
+<!-- generated_at: 2025-11-28T06:18:58Z -->
 # Platform: React Native
 
 ## /
