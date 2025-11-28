@@ -8,7 +8,9 @@ export class EventAPIService {
     deviceId: string,
     name: string,
     properties: Record<string, any>,
-    messageId?: string
+    messageId?: string,
+    userJourneyId?: string,
+    userJourneyNodeId?: string
   ): Promise<void> {
     try {
       ClixLogger.debug(`Tracking event: ${name} for device: ${deviceId}`);
@@ -19,6 +21,8 @@ export class EventAPIService {
         event_property: {
           custom_properties: properties,
           ...(messageId && { message_id: messageId }),
+          ...(userJourneyId && { user_journey_id: userJourneyId }),
+          ...(userJourneyNodeId && { user_journey_node_id: userJourneyNodeId }),
         },
       };
 

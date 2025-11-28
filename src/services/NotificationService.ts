@@ -1,9 +1,11 @@
 import notifee, {
   AndroidImportance,
   AndroidStyle,
+  AuthorizationStatus,
   EventType,
   type AndroidChannel,
   type Event,
+  type NotificationSettings,
 } from '@notifee/react-native';
 import messaging, {
   FirebaseMessagingTypes,
@@ -22,6 +24,19 @@ interface NotificationContent {
   body: string;
   imageUrl?: string;
 }
+
+type NotificationData = Record<string, any>;
+
+export type ForegroundMessageHandler = (
+  data: NotificationData
+) => Promise<boolean> | boolean;
+export type BackgroundMessageHandler = (
+  data: NotificationData
+) => Promise<void> | void;
+export type NotificationOpenedHandler = (
+  data: NotificationData
+) => Promise<void> | void;
+export type FcmTokenErrorHandler = (error: Error) => Promise<void> | void;
 
 export class NotificationService {
   private static instance: NotificationService | null = null;
@@ -45,6 +60,12 @@ export class NotificationService {
   private storageService!: StorageService;
   private deviceService?: DeviceService;
   private tokenService?: TokenService;
+
+  private autoHandleLandingUrl = true;
+  private messageHandler?: ForegroundMessageHandler;
+  private backgroundMessageHandler?: BackgroundMessageHandler;
+  private openedHandler?: NotificationOpenedHandler;
+  private fcmTokenErrorHandler?: FcmTokenErrorHandler;
 
   private unsubscribeForegroundMessage?: () => void;
   private unsubscribeNotificationOpened?: () => void;
@@ -106,6 +127,7 @@ export class NotificationService {
       return this.currentPushToken;
     } catch (error) {
       ClixLogger.error('Failed to get push token', error);
+      await this.handleFcmTokenError(error);
       return null;
     }
   }
@@ -120,16 +142,27 @@ export class NotificationService {
     ClixLogger.debug('Notification service cleaned up');
   }
 
+  setMessageHandler(handler?: ForegroundMessageHandler): void {
+    this.messageHandler = handler;
+  }
+
+  setBackgroundMessageHandler(handler?: BackgroundMessageHandler): void {
+    this.backgroundMessageHandler = handler;
+  }
+
+  setNotificationOpenedHandler(handler?: NotificationOpenedHandler): void {
+    this.openedHandler = handler;
+  }
+
+  setFcmTokenErrorHandler(handler?: FcmTokenErrorHandler): void {
+    this.fcmTokenErrorHandler = handler;
+  }
+
+  setAutoHandleLandingUrl(enable: boolean): void {
+    this.autoHandleLandingUrl = enable;
+  }
+
   private async initializeNotificationDisplayService(): Promise<void> {
-    await notifee.requestPermission({
-      alert: true,
-      badge: true,
-      sound: true,
-      criticalAlert: false,
-      announcement: false,
-      carPlay: false,
-      provisional: false,
-    });
     if (Platform.OS === 'android') {
       await this.createNotificationChannels();
     }
@@ -190,13 +223,8 @@ export class NotificationService {
 
   private async initializeMessageService(): Promise<void> {
     this.setupMessageHandlers();
-    const settings = await this.requestMessagePermission();
-    if (settings !== messaging.AuthorizationStatus.DENIED) {
-      await this.getAndUpdateToken();
-      this.setupTokenRefreshListener();
-    } else {
-      ClixLogger.warn('Push notification permission denied');
-    }
+    await this.getAndUpdateToken();
+    this.setupTokenRefreshListener();
   }
 
   private setupMessageHandlers(): void {
@@ -222,8 +250,17 @@ export class NotificationService {
   private async handleBackgroundMessage(
     remoteMessage: FirebaseMessagingTypes.RemoteMessage
   ): Promise<void> {
+    ClixLogger.debug('Handling background message:', remoteMessage.messageId);
+
+    const data = remoteMessage.data ?? {};
     try {
-      const clixPayload = this.parseClixPayload(remoteMessage.data ?? {});
+      await this.backgroundMessageHandler?.(data);
+    } catch (error) {
+      ClixLogger.warn('Background message handler failed', error);
+    }
+
+    try {
+      const clixPayload = this.parseClixPayload(data);
       if (!clixPayload) {
         ClixLogger.warn('No Clix payload found in background message');
         return;
@@ -231,7 +268,7 @@ export class NotificationService {
 
       this.storageService.set('last_background_notification', {
         messageId: remoteMessage.messageId,
-        data: remoteMessage.data ?? {},
+        data: data,
         timestamp: Date.now(),
         clixMessageId: clixPayload.messageId,
         campaignId: clixPayload.campaignId,
@@ -251,6 +288,8 @@ export class NotificationService {
   private async handleForegroundMessage(
     remoteMessage: FirebaseMessagingTypes.RemoteMessage
   ): Promise<void> {
+    ClixLogger.debug('Handling foreground message:', remoteMessage.messageId);
+
     try {
       const messageId = remoteMessage.messageId;
       if (!messageId) {
@@ -266,12 +305,24 @@ export class NotificationService {
         return;
       }
 
-      const clixPayload = this.parseClixPayload(remoteMessage.data ?? {});
+      const data = remoteMessage.data ?? {};
+      const clixPayload = this.parseClixPayload(data);
       if (clixPayload) {
         ClixLogger.debug('Parsed Clix payload:', clixPayload);
         this.processedMessageIds.add(messageId);
-        await this.handlePushReceived(remoteMessage.data ?? {});
-        await this.displayNotification(remoteMessage, clixPayload);
+        if (Platform.OS === 'android') {
+          // NOTE(nyanxyz): on iOS, Received event is tracked in NSE
+          await this.handlePushReceived(data);
+        }
+
+        if (await this.shouldDisplayForegroundNotification(data)) {
+          await this.displayNotification(remoteMessage, clixPayload);
+        } else {
+          ClixLogger.debug(
+            'Foreground message suppressed by user handler:',
+            messageId
+          );
+        }
       } else {
         ClixLogger.warn('No Clix payload found in foreground message');
       }
@@ -280,8 +331,8 @@ export class NotificationService {
     }
   }
 
-  private async requestMessagePermission(): Promise<any> {
-    const settings = await this.messagingService.requestPermission({
+  async requestPermission(): Promise<NotificationSettings> {
+    const settings = await notifee.requestPermission({
       alert: true,
       badge: true,
       sound: true,
@@ -291,11 +342,33 @@ export class NotificationService {
       criticalAlert: false,
     });
     ClixLogger.debug('Push notification permission status:', settings);
-    this.storageService.set(
-      'notification_permission_status',
-      settings.toString()
-    );
+
+    const isGranted =
+      settings.authorizationStatus === AuthorizationStatus.AUTHORIZED ||
+      settings.authorizationStatus === AuthorizationStatus.PROVISIONAL;
+    await this.setPermissionGranted(isGranted);
+
     return settings;
+  }
+
+  async setPermissionGranted(isGranted: boolean): Promise<void> {
+    if (!this.deviceService) {
+      ClixLogger.debug(
+        'Device service is not initialized, skipping push permission upsert'
+      );
+      return;
+    }
+
+    try {
+      await this.deviceService.upsertIsPushPermissionGranted(isGranted);
+      ClixLogger.debug(
+        `Push permission status reported to server: ${
+          isGranted ? 'granted' : 'denied'
+        }`
+      );
+    } catch (error) {
+      ClixLogger.warn('Failed to upsert push permission status', error);
+    }
   }
 
   private setupTokenRefreshListener(): void {
@@ -307,6 +380,7 @@ export class NotificationService {
           await this.saveAndRegisterToken(token);
         } catch (error) {
           ClixLogger.error('Failed to handle token refresh', error);
+          await this.handleFcmTokenError(error);
         }
       }
     );
@@ -344,7 +418,10 @@ export class NotificationService {
       const savedToken = this.tokenService.getCurrentToken();
       if (savedToken) return savedToken;
     }
+
+    await this.messagingService.registerDeviceForRemoteMessages();
     const token = await this.messagingService.getToken();
+
     if (token) {
       ClixLogger.debug('Got push token:', token.substring(0, 20) + '...');
       this.tokenService?.saveToken(token);
@@ -354,7 +431,7 @@ export class NotificationService {
 
   private async saveAndRegisterToken(token: string): Promise<void> {
     if (this.tokenService) {
-      await this.tokenService.saveToken(token);
+      this.tokenService.saveToken(token);
       ClixLogger.debug('New push token saved via TokenService');
     }
     await this.registerTokenWithServer(token);
@@ -561,7 +638,9 @@ export class NotificationService {
       if (clixPayload) {
         await this.trackPushEvent('PUSH_NOTIFICATION_TAPPED', clixPayload);
       }
-      await this.handleUrlNavigation(data);
+      if (this.autoHandleLandingUrl) {
+        await this.handleUrlNavigation(data);
+      }
       ClixLogger.debug('Push notification tapped and processed');
     } catch (error) {
       ClixLogger.error('Failed to handle push tapped', error);
@@ -571,6 +650,12 @@ export class NotificationService {
   private async handleNotificationTap(
     data: Record<string, any>
   ): Promise<void> {
+    try {
+      await this.openedHandler?.(data);
+    } catch (error) {
+      ClixLogger.error('Failed to handle notification tap', error);
+    }
+
     try {
       await this.handlePushTapped(data);
     } catch (error) {
@@ -709,6 +794,31 @@ export class NotificationService {
       );
     } catch (error) {
       ClixLogger.error('Error tracking event in background', error);
+    }
+  }
+
+  private async shouldDisplayForegroundNotification(
+    data: Record<string, any>
+  ): Promise<boolean> {
+    try {
+      const result = await this.messageHandler?.(data);
+      return result !== false;
+    } catch (error) {
+      ClixLogger.warn(
+        'Foreground message handler failed, displaying notification by default',
+        error
+      );
+      return true;
+    }
+  }
+
+  private async handleFcmTokenError(error: any): Promise<void> {
+    try {
+      const errorInstance =
+        error instanceof Error ? error : new Error(String(error));
+      await this.fcmTokenErrorHandler?.(errorInstance);
+    } catch (handlerError) {
+      ClixLogger.warn('FCM token error handler failed', handlerError);
     }
   }
 }

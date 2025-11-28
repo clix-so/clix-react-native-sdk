@@ -10,15 +10,18 @@ import { ClixError } from '../utils/ClixError';
 import { ClixLogger, ClixLogLevel } from '../utils/logging/ClixLogger';
 import type { ClixConfig } from './ClixConfig';
 import { ClixInitCoordinator } from './ClixInitCoordinator';
+import { ClixNotification } from './ClixNotification';
 
 export class Clix {
-  private static shared?: Clix;
-  private static initCoordinator = new ClixInitCoordinator();
+  static shared?: Clix;
+  static initCoordinator = new ClixInitCoordinator();
 
-  protected storageService?: StorageService;
-  protected eventService?: EventService;
-  protected deviceService?: DeviceService;
-  protected notificationService?: NotificationService;
+  static Notification = ClixNotification.shared;
+
+  storageService?: StorageService;
+  eventService?: EventService;
+  deviceService?: DeviceService;
+  notificationService?: NotificationService;
 
   private constructor() {}
 
@@ -153,7 +156,7 @@ export class Clix {
   }
 
   /**
-   * Get push token
+   * @deprecated Use Clix.Notification.getToken() instead.
    */
   static async getPushToken(): Promise<string | undefined> {
     try {
@@ -179,21 +182,14 @@ export class Clix {
   /**
    * Track event
    */
-  protected static async trackEvent(
+  static async trackEvent(
     name: string,
-    options?: {
-      properties?: Record<string, any>;
-      messageId?: string;
-    }
+    properties: Record<string, any> = {}
   ): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
       if (this.shared?.eventService) {
-        await this.shared.eventService.trackEvent(
-          name,
-          options?.properties,
-          options?.messageId
-        );
+        await this.shared.eventService.trackEvent(name, properties);
       }
     } catch (error) {
       ClixLogger.error(`Failed to track event: ${error}`);
