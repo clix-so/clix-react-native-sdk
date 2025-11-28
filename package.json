@@ -1,6 +1,6 @@
 {
   "name": "@clix-so/react-native-sdk",
-  "version": "0.0.1",
+  "version": "0.0.2-beta.1",
   "description": "Clix - Mobile push for builders",
   "main": "./lib/module/index.js",
   "types": "./lib/typescript/src/index.d.ts",
