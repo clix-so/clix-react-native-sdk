@@ -417,6 +417,27 @@ if [[ -f "$EXISTING_LLMS_PATH" ]]; then
   done < "$EXISTING_LLMS_PATH"
 fi
 
+# If no explicit base/head/compare range is provided, try to auto-detect BASE_REF
+# from the existing LLMS header comment:
+#   <!-- commit: <sha> -->
+# This enables local incremental runs mirroring the CI workflow, e.g.:
+#   ./scripts/generate_llms.sh --llm --output llms.txt
+# IMPORTANT: when --llm-all is used, we intentionally skip auto-compare and
+# force a full (non-incremental) scan so LLM runs for all files.
+if [[ "$LLM_FORCE_ALL" != "true" && -z "${BASE_REF:-}" && -z "${HEAD_REF:-}" && -z "${COMPARE_RANGE:-}" && -f "$EXISTING_LLMS_PATH" ]]; then
+  base_from_llms="$(grep -m1 '^<!-- commit:' "$EXISTING_LLMS_PATH" | sed -E 's/<!-- commit:[[:space:]]*([0-9a-f]+)[[:space:]]*-->/\1/' || true)"
+  if [[ -n "$base_from_llms" ]]; then
+    # Only use this SHA if it exists in the current repo; otherwise fall back to full scan.
+    if git rev-parse --verify --quiet "$base_from_llms^{commit}" >/dev/null 2>&1; then
+      BASE_REF="$base_from_llms"
+      HEAD_REF="${HEAD_REF:-$HEAD_SHA}"
+      echo "Auto-detected compare range from existing LLMS: ${BASE_REF}...${HEAD_REF}" >&2
+    else
+      echo "Existing LLMS commit ${base_from_llms} not found in this repo; skipping auto-compare and running full scan." >&2
+    fi
+  fi
+fi
+
 # Folder-based grouping
 DIR_LIST="${SECTION_TMP_DIR}/dirs.txt"
 > "$DIR_LIST"
@@ -534,21 +555,22 @@ if [[ -f "$EXISTING_LLMS_PATH" && -s "$CHANGED_SET" ]]; then
   exit 0
 fi
 
-# If a compare range was provided but there are NO changes, just refresh header and exit
+# If a compare range was provided but there are NO changed target files,
+# leave the existing llms.txt untouched so that callers see "no changes"
+# and we don't open a meaningless PR that only bumps metadata.
 if [[ -f "$EXISTING_LLMS_PATH" && -n "${COMPARE_RANGE:-${BASE_REF:-}${HEAD_REF:-}}" && ! -s "$CHANGED_SET" ]]; then
-  OUTFILE="$STAGING_PATH"
-  cp "$EXISTING_LLMS_PATH" "$OUTFILE" 2>/dev/null || : > "$OUTFILE"
-  update_header_in_place "$HEAD_SHA" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  if [[ -n "${OUTPUT_PATH}" && -n "${OUTPUT_SINK:-}" ]]; then
-    mv "$OUTFILE" "$OUTPUT_PATH"
-    echo "Wrote ${OUTPUT_PATH}" >&2
-  else
-    cat "$OUTFILE"
+  echo "No tracked file changes detected for compare range; keeping existing llms.txt as-is." >&2
+  # When OUTPUT_PATH is set, ensure the file still exists at the expected location.
+  if [[ -n "${OUTPUT_PATH}" ]]; then
+    cp "$EXISTING_LLMS_PATH" "$OUTPUT_PATH"
+  fi
+  if [[ "${PRINT_STDOUT}" == "true" ]]; then
+    cat "$EXISTING_LLMS_PATH"
   fi
   exit 0
 fi
 
-# Now that HEAD_SHA is finalized (and no surgical mode), write header
+# Now that HEAD_SHA is finalized (and no surgical mode or no existing LLMS), write header
 write_line "<!-- commit: ${HEAD_SHA} -->"
 write_line "<!-- generated_at: $(date -u +%Y-%m-%dT%H:%M:%SZ) -->"
 write_line "# Platform: ${human_platform}"
