@@ -114,8 +114,8 @@ export class NotificationService {
       this.deviceService = deviceService;
       this.tokenService = tokenService;
 
-      await this.initializeNotificationDisplayService();
       await this.initializeMessageService();
+      await this.initializeNotificationDisplayService();
 
       this.isInitialized = true;
       ClixLogger.debug('Notification service initialized successfully');
