@@ -1,4 +1,5 @@
 import * as MMKVModule from 'react-native-mmkv';
+import { getAppGroupDirectory } from '../native/getAppGroupDirectory';
 import { ClixLogger } from '../utils/logging/ClixLogger';
 
 // Support both v2/v3 (MMKV class) and v4 (createMMKV function)
@@ -18,6 +19,28 @@ export class StorageService {
     this.storage = this.initializeCompat(projectId);
   }
 
+  private getStoragePath(): string | undefined {
+    try {
+      const directory = getAppGroupDirectory();
+      if (!directory) {
+        return undefined;
+      }
+
+      /**
+       * NOTE(nyanxyz):
+       * On iOS the mmkv directory is located at {App Group Directory}/mmkv.
+       * RN MMKV v2 used {App Group Directory}/mmkv, but v3 switched to {App Group Directory}.
+       * We need to keep the directory aligned so iOS and RN can share storage.
+       * Therefore we explicitly target the mmkv folder inside the App Group directory.
+       * @see https://akshayjadhav.hashnode.dev/how-to-access-react-native-mmkv-in-a-ios-widget-react-native-expo
+       */
+      return `${directory}/mmkv`;
+    } catch (error) {
+      ClixLogger.warn('Failed to resolve App Group directory', error);
+      return undefined;
+    }
+  }
+
   private initializeCompat(projectId: string) {
     const storageId = `clix.${projectId}`;
 
@@ -26,6 +49,8 @@ export class StorageService {
       return MMKVModule.createMMKV({
         id: storageId,
         encryptionKey: undefined, // Add encryption if needed
+        path: this.getStoragePath(),
+        mode: 'multi-process',
       });
     }
     // v2/v3 API (MMKV class)
@@ -34,6 +59,8 @@ export class StorageService {
       return new MMKV({
         id: storageId,
         encryptionKey: undefined, // Add encryption if needed
+        path: this.getStoragePath(),
+        mode: 'multi-process',
       });
     } else {
       throw new Error('No compatible MMKV storage API found');
