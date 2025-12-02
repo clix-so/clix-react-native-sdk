@@ -44,5 +44,5 @@ end
 
 target 'ClixNotificationExtension' do
   use_frameworks! :linkage => :static
-  pod 'Clix', '1.6.0-beta.4'
+  pod 'Clix', '1.6.0-beta.2'
 end
