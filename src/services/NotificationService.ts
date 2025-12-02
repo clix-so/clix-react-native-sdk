@@ -419,7 +419,6 @@ export class NotificationService {
       if (savedToken) return savedToken;
     }
 
-    await this.messagingService.registerDeviceForRemoteMessages();
     const token = await this.messagingService.getToken();
 
     if (token) {
