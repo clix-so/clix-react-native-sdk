@@ -199,19 +199,19 @@ export class Clix {
   /**
    * Set configuration
    */
-  private async setConfig(config: ClixConfig): Promise<void> {
+  private async setConfig(rawConfig: ClixConfig): Promise<void> {
+    const config: Required<ClixConfig> = {
+      ...rawConfig,
+      endpoint: rawConfig.endpoint || 'https://api.clix.so',
+      logLevel: rawConfig.logLevel || ClixLogLevel.INFO,
+      extraHeaders: rawConfig.extraHeaders || {},
+    };
     this.storageService = new StorageService(config.projectId);
 
     try {
       this.storageService.set('project_id', config.projectId);
       this.storageService.set('api_key', config.apiKey);
-      this.storageService.set('clix_config', {
-        projectId: config.projectId,
-        apiKey: config.apiKey,
-        endpoint: config.endpoint,
-        logLevel: config.logLevel,
-        extraHeaders: config.extraHeaders,
-      });
+      this.storageService.set('clix_config', config);
     } catch (error) {
       ClixLogger.warn(
         'Failed to store configuration in storage, continuing with in-memory config',
@@ -219,11 +219,7 @@ export class Clix {
       );
     }
 
-    const apiClient = new ClixAPIClient({
-      ...config,
-      endpoint: config.endpoint || 'https://api.clix.so',
-      logLevel: config.logLevel || ClixLogLevel.ERROR,
-    });
+    const apiClient = new ClixAPIClient(config);
 
     const deviceAPIService = new DeviceAPIService(apiClient);
     const eventAPIService = new EventAPIService(apiClient);
