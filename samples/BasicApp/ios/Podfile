@@ -44,5 +44,5 @@ end
 
 target 'ClixNotificationExtension' do
   use_frameworks! :linkage => :static
-  pod 'Clix', :path => File.expand_path("~/Developer/clix-ios-sdk", __dir__)
+  pod 'Clix', '1.6.0-beta.4'
 end

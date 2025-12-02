@@ -35,6 +35,7 @@ function App() {
   useEffect(() => {
     const initialize = async () => {
       try {
+        await Clix.Notification.configure({ autoRequestPermission: true });
         const currentDeviceId = await Clix.getDeviceId();
         const currentPushToken = await Clix.Notification.getToken();
         setDeviceId(currentDeviceId || null);
