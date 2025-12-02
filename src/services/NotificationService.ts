@@ -1,10 +1,14 @@
 import notifee, {
+  AndroidCategory,
+  AndroidGroupAlertBehavior,
   AndroidImportance,
   AndroidStyle,
+  AndroidVisibility,
   AuthorizationStatus,
   EventType,
   type AndroidChannel,
   type Event,
+  type Notification,
   type NotificationSettings,
 } from '@notifee/react-native';
 import messaging, {
@@ -42,7 +46,7 @@ export class NotificationService {
   private static instance: NotificationService | null = null;
 
   private static readonly DEFAULT_CHANNEL: AndroidChannel = {
-    id: 'clix_default',
+    id: 'clix_channel',
     name: 'Clix Notifications',
     description: 'Default notifications from Clix',
     importance: AndroidImportance.HIGH,
@@ -50,6 +54,7 @@ export class NotificationService {
     vibration: true,
     lights: true,
   };
+  private static readonly ANDROID_GROUP_ID = 'clix_notification_group';
 
   private messagingService = messaging();
   private isInitialized = false;
@@ -184,6 +189,9 @@ export class NotificationService {
         await this.handleNotificationEvent(event);
       }
     );
+    notifee.onBackgroundEvent(async (event: Event) => {
+      await this.handleNotificationEvent(event);
+    });
   }
 
   private async handleNotificationEvent(event: Event): Promise<void> {
@@ -241,6 +249,10 @@ export class NotificationService {
     this.unsubscribeNotificationOpened =
       this.messagingService.onNotificationOpenedApp(
         async (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
+          ClixLogger.debug('Notification opened from background state:', {
+            messageId: remoteMessage.messageId,
+            data: remoteMessage.data,
+          });
           await this.handleNotificationTap(remoteMessage.data ?? {});
         }
       );
@@ -492,17 +504,32 @@ export class NotificationService {
     notificationContent: NotificationContent,
     channelId: string
   ) {
-    const config: any = {
+    const imageUrl = notificationContent.imageUrl;
+
+    const config: Notification &
+      Required<Pick<Notification, 'android' | 'ios'>> = {
       id: remoteMessage.messageId || Date.now().toString(),
       title: notificationContent.title,
       body: notificationContent.body,
       data: remoteMessage.data ?? {},
       android: {
         channelId,
+        importance: AndroidImportance.HIGH,
+        category: AndroidCategory.MESSAGE,
+        visibility: AndroidVisibility.PUBLIC,
+        groupId: NotificationService.ANDROID_GROUP_ID,
+        groupSummary: false,
+        groupAlertBehavior: AndroidGroupAlertBehavior.CHILDREN,
+        sound: 'default',
+        ticker: notificationContent.body,
+        actions: this.createNotificationActions(clixPayload),
+        style: {
+          type: AndroidStyle.BIGTEXT,
+          text: notificationContent.body ?? '',
+        },
         pressAction: {
           id: 'default',
         },
-        actions: this.createNotificationActions(clixPayload),
       },
       ios: {
         foregroundPresentationOptions: {
@@ -514,35 +541,11 @@ export class NotificationService {
       },
     };
 
-    if (notificationContent.imageUrl) {
-      if (this.isValidImageUrl(notificationContent.imageUrl)) {
-        ClixLogger.debug(
-          'Adding image attachment to notification:',
-          notificationContent.imageUrl
-        );
-        if (Platform.OS === 'ios') {
-          try {
-            config.ios.attachments = [
-              {
-                url: notificationContent.imageUrl,
-              },
-            ];
-          } catch (error) {
-            ClixLogger.warn('Failed to download image attachment:', error);
-          }
-        } else {
-          config.android.style = {
-            type: AndroidStyle.BIGPICTURE,
-            picture: notificationContent.imageUrl,
-          };
-        }
-      } else {
-        ClixLogger.warn(
-          'Skipping attachment due to invalid URL:',
-          notificationContent.imageUrl
-        );
-      }
+    if (imageUrl) {
+      ClixLogger.debug('Adding image attachment to notification:', imageUrl);
+      config.android.largeIcon = imageUrl;
     }
+
     return config;
   }
 
