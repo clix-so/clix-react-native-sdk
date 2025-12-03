@@ -8,7 +8,7 @@ class NotificationService: ClixNotificationServiceExtension {
     override init() {
         super.init()
         // Register your Clix project ID
-        register(projectId: "5dbdd10e-6ea6-4ff7-836d-bd30a6d1a521")
+        register(projectId: "YOUR_PROJECT_ID")
     }
 
     override func didReceive(

@@ -4,8 +4,8 @@ import { name as appName } from './app.json';
 import App from './src/App';
 
 Clix.initialize({
-  projectId: '',
-  apiKey: '',
+  projectId: 'YOUR_PROJECT_ID',
+  apiKey: 'YOUR_API_KEY',
 });
 
 AppRegistry.registerComponent(appName, () => App);
