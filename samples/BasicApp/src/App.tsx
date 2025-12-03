@@ -22,38 +22,43 @@ function App() {
   const [propertyValue, setPropertyValue] = useState('');
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [pushToken, setPushToken] = useState<string | null>(null);
+  const [eventName, setEventName] = useState('test');
+  const [eventParams, setEventParams] = useState(
+    `{
+  "string": "string",
+  "number": 1.5,
+  "boolean": true,
+  "object": { "key": "value" }
+}`
+  );
 
   useEffect(() => {
     const initialize = async () => {
       try {
-        try {
-          const currentDeviceId = await Clix.getDeviceId();
-          const currentPushToken = await Clix.getPushToken();
-          setDeviceId(currentDeviceId || null);
-          setPushToken(currentPushToken || null);
-        } catch (deviceError) {
-          console.warn(
-            'Failed to get device info immediately after init:',
-            deviceError
-          );
-          setDeviceId('Loading...');
-          setPushToken('Loading...');
-          setTimeout(async () => {
-            try {
-              const currentDeviceId = await Clix.getDeviceId();
-              const currentPushToken = await Clix.getPushToken();
-              setDeviceId(currentDeviceId || null);
-              setPushToken(currentPushToken || null);
-            } catch (retryError) {
-              console.error('Failed to get device info on retry:', retryError);
-              setDeviceId('Error loading');
-              setPushToken('Error loading');
-            }
-          }, 1000);
-        }
-      } catch (error) {
-        console.error('Failed to initialize Clix SDK:', error);
-        Alert.alert('Error', `Failed to initialize Clix SDK: ${error}`);
+        await Clix.Notification.configure({ autoRequestPermission: true });
+        const currentDeviceId = await Clix.getDeviceId();
+        const currentPushToken = await Clix.Notification.getToken();
+        setDeviceId(currentDeviceId || null);
+        setPushToken(currentPushToken || null);
+      } catch (deviceError) {
+        console.warn(
+          'Failed to get device info immediately after init:',
+          deviceError
+        );
+        setDeviceId('Loading...');
+        setPushToken('Loading...');
+        setTimeout(async () => {
+          try {
+            const currentDeviceId = await Clix.getDeviceId();
+            const currentPushToken = await Clix.Notification.getToken();
+            setDeviceId(currentDeviceId || null);
+            setPushToken(currentPushToken || null);
+          } catch (retryError) {
+            console.error('Failed to get device info on retry:', retryError);
+            setDeviceId('Error loading');
+            setPushToken('Error loading');
+          }
+        }, 1000);
       }
     };
     initialize();
@@ -90,6 +95,32 @@ function App() {
     } catch (error) {
       console.error('Failed to set property:', error);
       Alert.alert('Error', 'Failed to set property');
+    }
+  };
+
+  const handleTrackEvent = async () => {
+    if (!eventName.trim()) {
+      Alert.alert('Error', 'Please enter an event name');
+      return;
+    }
+
+    let parsedParams: Record<string, unknown> = {};
+
+    if (eventParams.trim() && eventParams.trim() !== '{}') {
+      try {
+        parsedParams = JSON.parse(eventParams);
+      } catch (error) {
+        Alert.alert('Error', 'Invalid JSON format');
+        return;
+      }
+    }
+
+    try {
+      await Clix.trackEvent(eventName, parsedParams);
+      Alert.alert('Success', `Event tracked: ${eventName}`);
+    } catch (error) {
+      console.error('Failed to track event:', error);
+      Alert.alert('Error', 'Failed to track event');
     }
   };
 
@@ -176,6 +207,37 @@ function App() {
           >
             <Text style={styles.buttonText}>Set User Property</Text>
           </TouchableOpacity>
+
+          <View style={styles.trackEventSection}>
+            <Text style={styles.label}>Event Name</Text>
+            <TextInput
+              style={styles.fullInput}
+              value={eventName}
+              onChangeText={setEventName}
+              placeholder="Enter event name"
+              placeholderTextColor="#666"
+            />
+
+            <Text style={[styles.label, styles.eventParamsLabel]}>
+              Event Params (JSON)
+            </Text>
+            <TextInput
+              style={styles.multilineInput}
+              value={eventParams}
+              onChangeText={setEventParams}
+              placeholder="{ }"
+              placeholderTextColor="#666"
+              multiline
+              textAlignVertical="top"
+            />
+
+            <TouchableOpacity
+              style={styles.setPropertyButton}
+              onPress={handleTrackEvent}
+            >
+              <Text style={styles.buttonText}>Track Event</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -252,6 +314,20 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 10,
+  },
+  trackEventSection: {
+    marginTop: 30,
+  },
+  eventParamsLabel: {
+    marginTop: 16,
+  },
+  multilineInput: {
+    backgroundColor: '#333',
+    color: '#fff',
+    padding: 15,
+    borderRadius: 8,
+    fontSize: 16,
+    minHeight: 140,
   },
   buttonText: {
     color: '#000',

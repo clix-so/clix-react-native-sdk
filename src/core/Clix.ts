@@ -10,15 +10,18 @@ import { ClixError } from '../utils/ClixError';
 import { ClixLogger, ClixLogLevel } from '../utils/logging/ClixLogger';
 import type { ClixConfig } from './ClixConfig';
 import { ClixInitCoordinator } from './ClixInitCoordinator';
+import { ClixNotification } from './ClixNotification';
 
 export class Clix {
-  private static shared?: Clix;
-  private static initCoordinator = new ClixInitCoordinator();
+  static shared?: Clix;
+  static initCoordinator = new ClixInitCoordinator();
 
-  protected storageService?: StorageService;
-  protected eventService?: EventService;
-  protected deviceService?: DeviceService;
-  protected notificationService?: NotificationService;
+  static Notification = ClixNotification.shared;
+
+  storageService?: StorageService;
+  eventService?: EventService;
+  deviceService?: DeviceService;
+  notificationService?: NotificationService;
 
   private constructor() {}
 
@@ -153,7 +156,7 @@ export class Clix {
   }
 
   /**
-   * Get push token
+   * @deprecated Use Clix.Notification.getToken() instead.
    */
   static async getPushToken(): Promise<string | undefined> {
     try {
@@ -179,21 +182,14 @@ export class Clix {
   /**
    * Track event
    */
-  protected static async trackEvent(
+  static async trackEvent(
     name: string,
-    options?: {
-      properties?: Record<string, any>;
-      messageId?: string;
-    }
+    properties: Record<string, any> = {}
   ): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
       if (this.shared?.eventService) {
-        await this.shared.eventService.trackEvent(
-          name,
-          options?.properties,
-          options?.messageId
-        );
+        await this.shared.eventService.trackEvent(name, properties);
       }
     } catch (error) {
       ClixLogger.error(`Failed to track event: ${error}`);
@@ -203,19 +199,19 @@ export class Clix {
   /**
    * Set configuration
    */
-  private async setConfig(config: ClixConfig): Promise<void> {
+  private async setConfig(rawConfig: ClixConfig): Promise<void> {
+    const config: Required<ClixConfig> = {
+      ...rawConfig,
+      endpoint: rawConfig.endpoint || 'https://api.clix.so',
+      logLevel: rawConfig.logLevel || ClixLogLevel.INFO,
+      extraHeaders: rawConfig.extraHeaders || {},
+    };
     this.storageService = new StorageService(config.projectId);
 
     try {
       this.storageService.set('project_id', config.projectId);
       this.storageService.set('api_key', config.apiKey);
-      this.storageService.set('clix_config', {
-        projectId: config.projectId,
-        apiKey: config.apiKey,
-        endpoint: config.endpoint,
-        logLevel: config.logLevel,
-        extraHeaders: config.extraHeaders,
-      });
+      this.storageService.set('clix_config', config);
     } catch (error) {
       ClixLogger.warn(
         'Failed to store configuration in storage, continuing with in-memory config',
@@ -223,11 +219,7 @@ export class Clix {
       );
     }
 
-    const apiClient = new ClixAPIClient({
-      ...config,
-      endpoint: config.endpoint || 'https://api.clix.so',
-      logLevel: config.logLevel || ClixLogLevel.ERROR,
-    });
+    const apiClient = new ClixAPIClient(config);
 
     const deviceAPIService = new DeviceAPIService(apiClient);
     const eventAPIService = new EventAPIService(apiClient);

@@ -1,3 +1,4 @@
+import { ClixDateFormatter } from '../utils/ClixDateFormatter';
 import { ClixLogger } from '../utils/logging/ClixLogger';
 import { DeviceService } from './DeviceService';
 import { EventAPIService } from './EventAPIService';
@@ -11,19 +12,24 @@ export class EventService {
   async trackEvent(
     name: string,
     properties?: Record<string, any>,
-    messageId?: string
+    messageId?: string,
+    userJourneyId?: string,
+    userJourneyNodeId?: string
   ): Promise<void> {
     try {
       ClixLogger.debug(`Tracking event: ${name}`);
 
-      const deviceId = await this.deviceService.getCurrentDeviceId();
+      const deviceId = this.deviceService.getCurrentDeviceId();
 
       const cleanProperties: Record<string, any> = {};
       if (properties) {
         Object.entries(properties).forEach(([key, value]) => {
-          if (value !== null && value !== undefined) {
-            cleanProperties[key] = value;
+          if (value instanceof Date) {
+            cleanProperties[key] = ClixDateFormatter.format(value);
+            return;
           }
+
+          cleanProperties[key] = value;
         });
       }
 
@@ -31,7 +37,9 @@ export class EventService {
         deviceId,
         name,
         cleanProperties,
-        messageId
+        messageId,
+        userJourneyId,
+        userJourneyNodeId
       );
 
       ClixLogger.debug(`Event tracked successfully: ${name}`);

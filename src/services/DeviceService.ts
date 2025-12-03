@@ -102,7 +102,7 @@ export class DeviceService {
 
   async upsertToken(token: string, tokenType: string = 'FCM'): Promise<void> {
     try {
-      await this.tokenService.saveToken(token);
+      this.tokenService.saveToken(token);
 
       const deviceId = this.getCurrentDeviceId();
       const device = await this.createDevice(deviceId, token);
@@ -132,17 +132,27 @@ export class DeviceService {
     }
   }
 
+  async upsertIsPushPermissionGranted(isGranted: boolean): Promise<void> {
+    try {
+      const deviceId = this.getCurrentDeviceId();
+      const currentToken = this.tokenService.getCurrentToken();
+      const device = await this.createDevice(deviceId, currentToken, isGranted);
+
+      await this.deviceAPIService.registerDevice(device);
+      ClixLogger.debug(
+        `Push permission status upserted: ${isGranted ? 'granted' : 'denied'}`
+      );
+    } catch (error) {
+      ClixLogger.error('Failed to upsert push permission status', error);
+      throw ClixError.unknownError({
+        reason: `Failed to upsert push permission status: ${error}`,
+        cause: error,
+      });
+    }
+  }
+
   private async getPushPermissionStatus(): Promise<boolean> {
     try {
-      // First check stored permission status
-      const storedStatus = this.storageService.get<string>(
-        'notification_permission_status'
-      );
-      if (storedStatus === 'authorized' || storedStatus === 'provisional') {
-        return true;
-      }
-
-      // If no stored status, check current Firebase messaging permission
       const authStatus = await messaging().hasPermission();
       const isGranted =
         authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
@@ -161,7 +171,11 @@ export class DeviceService {
     }
   }
 
-  async createDevice(deviceId: string, token?: string): Promise<ClixDevice> {
+  async createDevice(
+    deviceId: string,
+    token?: string,
+    isPushPermissionGranted?: boolean
+  ): Promise<ClixDevice> {
     const platform = DeviceInfo.getSystemName();
     const osName = DeviceInfo.getSystemName();
     const osVersion = DeviceInfo.getSystemVersion();
@@ -174,7 +188,8 @@ export class DeviceService {
     const localeLanguage = locale.split('-')[0] || 'en';
     const localeRegion = locale.split('-')[1] || 'US';
     let adId: string | undefined;
-    const isPushPermissionGranted = await this.getPushPermissionStatus();
+    const pushPermissionGranted =
+      isPushPermissionGranted ?? (await this.getPushPermissionStatus());
     const sdkVersion = await ClixVersion.getVersion();
 
     return new ClixDevice({
@@ -192,7 +207,7 @@ export class DeviceService {
       sdkType: 'react-native',
       sdkVersion,
       adId,
-      isPushPermissionGranted,
+      isPushPermissionGranted: pushPermissionGranted,
       pushToken: token,
       pushTokenType: token
         ? Platform.OS === 'ios'
