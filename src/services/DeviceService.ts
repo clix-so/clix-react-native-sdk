@@ -7,6 +7,7 @@ import { ClixLogger } from '../utils/logging/ClixLogger';
 import { UUID } from '../utils/UUID';
 import { DeviceAPIService } from './DeviceAPIService';
 import { StorageService } from './StorageService';
+import type { TokenService } from './TokenService';
 
 export class DeviceService {
   private deviceIdKey = 'clix_device_id';
@@ -14,6 +15,7 @@ export class DeviceService {
 
   constructor(
     private readonly storageService: StorageService,
+    private readonly tokenService: TokenService,
     private readonly deviceAPIService: DeviceAPIService
   ) {}
 
@@ -158,6 +160,7 @@ export class DeviceService {
   private async getPushToken(): Promise<string | undefined> {
     try {
       const token = await messaging().getToken();
+      this.tokenService.saveToken(token);
       return token;
     } catch (error) {
       ClixLogger.warn('Failed to get push token', error);

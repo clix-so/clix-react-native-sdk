@@ -34,8 +34,6 @@ function App() {
   useEffect(() => {
     const initialize = async () => {
       try {
-        await Clix.Notification.configure({ autoRequestPermission: true });
-
         const currentDeviceId = await Clix.getDeviceId();
         const currentPushToken = await Clix.Notification.getToken();
         setDeviceId(currentDeviceId || null);
@@ -44,6 +42,8 @@ function App() {
         Clix.Notification.onTokenRefresh((token) => {
           setPushToken(token);
         });
+
+        await Clix.Notification.configure({ autoRequestPermission: true });
       } catch (deviceError) {
         console.warn(
           'Failed to get device info immediately after init:',

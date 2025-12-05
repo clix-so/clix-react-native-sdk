@@ -57,6 +57,7 @@ export class Clix {
       this.shared.tokenService = new TokenService(this.shared.storageService);
       this.shared.deviceService = new DeviceService(
         this.shared.storageService,
+        this.shared.tokenService,
         deviceApiService
       );
       this.shared.eventService = new EventService(
