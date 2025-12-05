@@ -476,7 +476,6 @@ export class NotificationService {
         groupAlertBehavior: AndroidGroupAlertBehavior.CHILDREN,
         sound: 'default',
         ticker: clixPayload.body,
-        actions: this.createNotificationActions(),
         style: {
           type: AndroidStyle.BIGTEXT,
           text: clixPayload.body,
@@ -501,19 +500,6 @@ export class NotificationService {
     }
 
     return config;
-  }
-
-  private createNotificationActions() {
-    const actions = [];
-
-    actions.push({
-      title: 'Open',
-      pressAction: {
-        id: 'default',
-      },
-    });
-
-    return actions;
   }
 
   private async handleUrlNavigation(data: Record<string, any>): Promise<void> {
