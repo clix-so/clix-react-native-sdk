@@ -134,41 +134,42 @@ export class NotificationService {
 
   private setupPushReceivedHandler(): void {
     /**
-     * Android background message handler
+     * Android: background message handler
      */
     messaging().setBackgroundMessageHandler(
       this.handleBackgroundMessage.bind(this)
     );
     /**
-     * iOS + Android foreground message handler
+     * iOS & Android: foreground message handler
      */
     this.unsubscribeMessage = messaging().onMessage(
       this.handleForegroundMessage.bind(this)
     );
     /**
-     * iOS background message will be handled in Notification Service Extension
+     * iOS: background messages are handled in the Notification Service Extension
      */
   }
 
   private async setupPushTappedHandler(): Promise<void> {
     /**
-     * Android background notification tap handler
+     * Android: background notification tap handler
+     *          & app launched from quit state via a notification
      */
     notifee.onBackgroundEvent(this.handleNotificationEvent.bind(this));
     /**
-     * iOS + Android notification tap handler
+     * iOS & Android: foreground notification tap handler
      */
     this.unsubscribeForegroundEvent = notifee.onForegroundEvent(
       this.handleForegroundNotificationEvent.bind(this)
     );
     /**
-     * iOS background notification opened handler
+     * iOS: background notification tap handler
      */
     this.unsubscribeNotificationOpenedApp = messaging().onNotificationOpenedApp(
       this.handleNotificationOpenedApp.bind(this)
     );
     /**
-     * iOS quit launched from notification
+     * iOS: app launched from a quit state via a notification
      */
     await this.handleInitialNotification();
   }
@@ -201,8 +202,9 @@ export class NotificationService {
       ClixLogger.error('Failed to create notification channels', error);
     }
   }
+
   /**
-   * Android background message handler
+   * Android: background message handler
    */
   private async handleBackgroundMessage(
     remoteMessage: FirebaseMessagingTypes.RemoteMessage
@@ -234,7 +236,7 @@ export class NotificationService {
   }
 
   /**
-   * iOS + Android foreground message handler
+   * iOS & Android: foreground message handler
    */
   private async handleForegroundMessage(
     remoteMessage: FirebaseMessagingTypes.RemoteMessage
@@ -263,7 +265,7 @@ export class NotificationService {
       }
 
       if (Platform.OS === 'android') {
-        // NOTE(nyanxyz): on iOS, Received event is tracked in NSE
+        // NOTE(nyanxyz): on iOS, Received event is tracked in Notification Service Extension
         await this.trackPushReceivedEvent(clixPayload);
       }
 
@@ -274,7 +276,7 @@ export class NotificationService {
   }
 
   /**
-   * iOS Background notification opened handler
+   * iOS: background notification tap handler
    */
   private async handleNotificationOpenedApp(
     remoteMessage: FirebaseMessagingTypes.RemoteMessage
@@ -308,7 +310,7 @@ export class NotificationService {
   }
 
   /**
-   * iOS Quit launched from notification
+   * iOS: app launched from a quit state via a notification
    */
   private async handleInitialNotification(): Promise<void> {
     try {
@@ -334,7 +336,7 @@ export class NotificationService {
   }
 
   /**
-   * Android background notification tap handler
+   * Android: background notification tap handler
    */
   private async handleNotificationEvent(event: Event): Promise<void> {
     const { type, detail } = event;
@@ -361,7 +363,7 @@ export class NotificationService {
   }
 
   /**
-   * iOS + Android foreground notification tap handler
+   * iOS & Android: foreground notification tap handler
    */
   private async handleForegroundNotificationEvent(event: Event): Promise<void> {
     try {
