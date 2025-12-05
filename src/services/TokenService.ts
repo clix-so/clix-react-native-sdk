@@ -8,4 +8,8 @@ export class TokenService {
   getCurrentToken(): string | undefined {
     return this.storageService.get<string>(this.currentTokenKey);
   }
+
+  saveToken(token: string): void {
+    this.storageService.set(this.currentTokenKey, token);
+  }
 }

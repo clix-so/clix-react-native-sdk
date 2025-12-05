@@ -9,7 +9,6 @@ import { TokenService } from '../services/TokenService';
 import { ClixLogger, ClixLogLevel } from '../utils/logging/ClixLogger';
 import type { PickPartial, Prettify } from '../utils/types';
 import type { ClixConfig } from './ClixConfig';
-import { ClixEnvironment } from './ClixEnvironment';
 import { ClixInitCoordinator } from './ClixInitCoordinator';
 import { ClixNotification } from './ClixNotification';
 
@@ -23,7 +22,7 @@ export class Clix {
 
   static Notification = ClixNotification.shared;
 
-  environment?: ClixEnvironment;
+  config?: ClixConfig;
   storageService?: StorageService;
   tokenService?: TokenService;
   eventService?: EventService;
@@ -37,16 +36,18 @@ export class Clix {
    */
   static async initialize(options: ClixInitializeOptions): Promise<void> {
     try {
-      ClixLogger.debug('Initializing Clix SDK...');
-
-      this.shared = new Clix();
-
       const config: ClixConfig = {
         ...options,
         endpoint: options.endpoint || 'https://api.clix.so',
         logLevel: options.logLevel || ClixLogLevel.INFO,
         extraHeaders: options.extraHeaders || {},
       };
+
+      ClixLogger.setLogLevel(config.logLevel || ClixLogLevel.ERROR);
+      ClixLogger.debug('Initializing Clix SDK...');
+
+      this.shared = new Clix();
+      this.shared.config = config;
 
       const apiClient = new ClixAPIClient(config);
       const deviceApiService = new DeviceAPIService(apiClient);
@@ -63,22 +64,14 @@ export class Clix {
         this.shared.deviceService
       );
       this.shared.notificationService = new NotificationService(
-        this.shared.deviceService
+        this.shared.deviceService,
+        this.shared.tokenService,
+        this.shared.eventService
       );
-
-      const deviceId = this.shared.deviceService.getCurrentDeviceId();
-      const token = this.shared.tokenService.getCurrentToken();
-      const device = await this.shared.deviceService.createDevice(
-        deviceId,
-        token
-      );
-
-      const environment = new ClixEnvironment(config, device);
-      this.shared.environment = environment;
-
-      ClixLogger.setLogLevel(config.logLevel || ClixLogLevel.ERROR);
 
       this.shared.storageService.set(this.configKey, config);
+
+      const device = await this.shared.deviceService.createDevice();
       await this.shared.deviceService.upsertDevice(device);
 
       await this.shared.notificationService.initialize();

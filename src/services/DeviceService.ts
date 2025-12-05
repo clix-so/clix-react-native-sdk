@@ -1,6 +1,5 @@
 import messaging from '@react-native-firebase/messaging';
 import DeviceInfo from 'react-native-device-info';
-import { Clix } from '../core/Clix';
 import { ClixVersion } from '../core/ClixVersion';
 import { ClixDevice } from '../models/ClixDevice';
 import { ClixUserProperty } from '../models/ClixUserProperty';
@@ -34,10 +33,8 @@ export class DeviceService {
     return newDeviceId;
   }
 
-  async createDevice(
-    deviceId: string,
-    pushToken?: string
-  ): Promise<ClixDevice> {
+  async createDevice(): Promise<ClixDevice> {
+    const deviceId = this.getCurrentDeviceId();
     const platform = DeviceInfo.getSystemName();
     const osName = DeviceInfo.getSystemName();
     const osVersion = DeviceInfo.getSystemVersion();
@@ -53,6 +50,7 @@ export class DeviceService {
     const isPushPermissionGranted = await this.getPushPermissionStatus();
     const sdkType = 'react-native';
     const sdkVersion = await ClixVersion.getVersion();
+    const pushToken = await this.getPushToken();
     const pushTokenType = pushToken ? 'FCM' : undefined;
 
     return new ClixDevice({
@@ -77,7 +75,6 @@ export class DeviceService {
   }
 
   async upsertDevice(device: ClixDevice): Promise<void> {
-    Clix.shared?.environment?.setDevice(device);
     return this.deviceAPIService.upsertDevice(device);
   }
 
@@ -118,6 +115,16 @@ export class DeviceService {
         error
       );
       return false;
+    }
+  }
+
+  private async getPushToken(): Promise<string | undefined> {
+    try {
+      const token = await messaging().getToken();
+      return token;
+    } catch (error) {
+      ClixLogger.warn('Failed to get push token', error);
+      return undefined;
     }
   }
 }
