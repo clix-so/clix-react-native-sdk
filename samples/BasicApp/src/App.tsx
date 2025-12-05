@@ -13,7 +13,6 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
-import { ClixInfo } from './ClixInfo';
 
 function App() {
   useColorScheme();
@@ -36,10 +35,15 @@ function App() {
     const initialize = async () => {
       try {
         await Clix.Notification.configure({ autoRequestPermission: true });
+
         const currentDeviceId = await Clix.getDeviceId();
         const currentPushToken = await Clix.Notification.getToken();
         setDeviceId(currentDeviceId || null);
         setPushToken(currentPushToken || null);
+
+        Clix.Notification.onTokenRefresh((token) => {
+          setPushToken(token);
+        });
       } catch (deviceError) {
         console.warn(
           'Failed to get device info immediately after init:',
@@ -142,12 +146,14 @@ function App() {
 
           <View style={styles.infoContainer}>
             <Text style={styles.label}>Project ID:</Text>
-            <Text style={styles.infoText}>{ClixInfo.projectId}</Text>
+            <Text style={styles.infoText}>
+              {Clix.shared?.config?.projectId}
+            </Text>
           </View>
 
           <View style={styles.infoContainer}>
             <Text style={styles.label}>API Key:</Text>
-            <Text style={styles.infoText}>{ClixInfo.apiKey}</Text>
+            <Text style={styles.infoText}>{Clix.shared?.config?.apiKey}</Text>
           </View>
 
           <View style={styles.infoContainer}>
