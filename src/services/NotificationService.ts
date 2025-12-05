@@ -69,6 +69,7 @@ export class NotificationService {
   async initialize(): Promise<void> {
     if (this.isInitialized) {
       ClixLogger.debug('Notification service already initialized');
+      return;
     }
 
     try {
