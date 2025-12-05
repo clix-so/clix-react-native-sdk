@@ -575,11 +575,11 @@ export class NotificationService {
         ClixLogger.error('No messageId found in Clix payload');
         return null;
       }
-      if (!data.title) {
+      if (!payload.title) {
         ClixLogger.error('No title found in Clix payload');
         return null;
       }
-      if (!data.body) {
+      if (!payload.body) {
         ClixLogger.error('No body found in Clix payload');
         return null;
       }
