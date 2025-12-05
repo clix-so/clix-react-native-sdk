@@ -10,6 +10,7 @@ import { StorageService } from './StorageService';
 
 export class DeviceService {
   private deviceIdKey = 'clix_device_id';
+  private cachedDevice: ClixDevice | null = null;
 
   constructor(
     private readonly storageService: StorageService,
@@ -34,6 +35,10 @@ export class DeviceService {
   }
 
   async createDevice(): Promise<ClixDevice> {
+    if (this.cachedDevice) {
+      return this.cachedDevice;
+    }
+
     const deviceId = this.getCurrentDeviceId();
     const platform = DeviceInfo.getSystemName();
     const osName = DeviceInfo.getSystemName();
@@ -53,7 +58,7 @@ export class DeviceService {
     const pushToken = await this.getPushToken();
     const pushTokenType = pushToken ? 'FCM' : undefined;
 
-    return new ClixDevice({
+    const device = new ClixDevice({
       id: deviceId,
       platform,
       model,
@@ -72,9 +77,28 @@ export class DeviceService {
       pushToken,
       pushTokenType,
     });
+    this.cachedDevice = device;
+
+    return device;
   }
 
   async upsertDevice(device: ClixDevice): Promise<void> {
+    return this.deviceAPIService.upsertDevice(device);
+  }
+
+  async updatePushToken(
+    pushToken: string,
+    pushTokenType: string
+  ): Promise<void> {
+    const device = await this.createDevice();
+    device.pushToken = pushToken;
+    device.pushTokenType = pushTokenType;
+    return this.deviceAPIService.upsertDevice(device);
+  }
+
+  async updatePushPermission(isGranted: boolean): Promise<void> {
+    const device = await this.createDevice();
+    device.isPushPermissionGranted = isGranted;
     return this.deviceAPIService.upsertDevice(device);
   }
 

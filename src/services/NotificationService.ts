@@ -121,8 +121,7 @@ export class NotificationService {
 
   async setPermissionGranted(isGranted: boolean): Promise<void> {
     try {
-      const device = await this.deviceService.createDevice();
-      await this.deviceService.upsertDevice(device);
+      await this.deviceService.updatePushPermission(isGranted);
       ClixLogger.debug(
         `Push permission status reported to server: ${
           isGranted ? 'granted' : 'denied'
@@ -186,8 +185,7 @@ export class NotificationService {
         try {
           ClixLogger.debug(`Push token refreshed: ${token}`);
           this.tokenService.saveToken(token);
-          const device = await this.deviceService.createDevice();
-          await this.deviceService.upsertDevice(device);
+          await this.deviceService.updatePushToken(token, 'FCM');
         } catch (error) {
           ClixLogger.error('Failed to handle token refresh', error);
         }
