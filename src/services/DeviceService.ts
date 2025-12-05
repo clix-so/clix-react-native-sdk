@@ -91,6 +91,14 @@ export class DeviceService {
     pushTokenType: string
   ): Promise<void> {
     const device = await this.createDevice();
+    if (
+      device.pushToken === pushToken &&
+      device.pushTokenType === pushTokenType
+    ) {
+      ClixLogger.debug('Push token and type are unchanged, skipping update');
+      return;
+    }
+
     device.pushToken = pushToken;
     device.pushTokenType = pushTokenType;
     return this.deviceAPIService.upsertDevice(device);
@@ -98,6 +106,11 @@ export class DeviceService {
 
   async updatePushPermission(isGranted: boolean): Promise<void> {
     const device = await this.createDevice();
+    if (device.isPushPermissionGranted === isGranted) {
+      ClixLogger.debug('Push permission status is unchanged, skipping update');
+      return;
+    }
+
     device.isPushPermissionGranted = isGranted;
     return this.deviceAPIService.upsertDevice(device);
   }
