@@ -550,21 +550,37 @@ export class NotificationService {
     userInfo: Record<string, any>
   ): ClixPushNotificationPayload | null {
     try {
-      const data = userInfo?.clix;
+      let data = userInfo?.clix;
       if (data == null) {
         ClixLogger.debug("No 'clix' entry found in notification data");
         return null;
       }
 
+      if (typeof data === 'string') {
+        try {
+          data = JSON.parse(data);
+        } catch (parseError) {
+          ClixLogger.error(
+            'Failed to parse Clix payload JSON string',
+            parseError
+          );
+          return null;
+        }
+      }
+
+      ClixLogger.debug('Parsing Clix payload from notification data:', data);
+
       const payload: ClixPushNotificationPayload = {
         messageId: data.message_id,
         title: data.title,
         body: data.body,
-        imageUrl: data.image_url,
-        landingUrl: data.landing_url,
-        userJourneyId: data.user_journey_id,
-        userJourneyNodeId: data.user_journey_node_id,
+        imageUrl: data.image_url || undefined,
+        landingUrl: data.landing_url || undefined,
+        userJourneyId: data.user_journey_id || undefined,
+        userJourneyNodeId: data.user_journey_node_id || undefined,
       };
+
+      ClixLogger.debug('Constructed Clix payload:', payload);
 
       if (!payload.messageId) {
         ClixLogger.error('No messageId found in Clix payload');
