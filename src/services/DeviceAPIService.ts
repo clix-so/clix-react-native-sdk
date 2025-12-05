@@ -6,39 +6,37 @@ import { ClixAPIClient } from './ClixAPIClient';
 export class DeviceAPIService {
   constructor(private readonly apiClient: ClixAPIClient) {}
 
-  async registerDevice(device: ClixDevice): Promise<void> {
+  async upsertDevice(device: ClixDevice): Promise<void> {
     try {
       ClixLogger.debug(`Upserting device: ${device.id}`);
 
       const response = await this.apiClient.post('/devices', {
-        body: {
-          devices: [
-            {
-              id: device.id,
-              platform: device.platform,
-              model: device.model,
-              manufacturer: device.manufacturer,
-              os_name: device.osName,
-              os_version: device.osVersion,
-              locale_region: device.localeRegion,
-              locale_language: device.localeLanguage,
-              timezone: device.timezone,
-              app_name: device.appName,
-              app_version: device.appVersion,
-              sdk_type: device.sdkType,
-              sdk_version: device.sdkVersion,
-              ad_id: device.adId,
-              is_push_permission_granted: device.isPushPermissionGranted,
-              push_token: device.pushToken,
-              push_token_type: device.pushTokenType,
-            },
-          ],
-        },
+        devices: [
+          {
+            id: device.id,
+            platform: device.platform,
+            model: device.model,
+            manufacturer: device.manufacturer,
+            os_name: device.osName,
+            os_version: device.osVersion,
+            locale_region: device.localeRegion,
+            locale_language: device.localeLanguage,
+            timezone: device.timezone,
+            app_name: device.appName,
+            app_version: device.appVersion,
+            sdk_type: device.sdkType,
+            sdk_version: device.sdkVersion,
+            ad_id: device.adId,
+            is_push_permission_granted: device.isPushPermissionGranted,
+            push_token: device.pushToken,
+            push_token_type: device.pushTokenType,
+          },
+        ],
       });
 
-      if (response.status < 200 || response.status >= 300) {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
         throw new Error(
-          `HTTP ${response.status}: ${JSON.stringify(response.data)}`
+          `HTTP ${response.statusCode}: ${JSON.stringify(response.data)}`
         );
       }
 
@@ -59,15 +57,13 @@ export class DeviceAPIService {
       const response = await this.apiClient.post(
         `/devices/${deviceId}/user/project-user-id`,
         {
-          body: {
-            project_user_id: projectUserId,
-          },
+          project_user_id: projectUserId,
         }
       );
 
-      if (response.status < 200 || response.status >= 300) {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
         throw new Error(
-          `HTTP ${response.status}: ${JSON.stringify(response.data)}`
+          `HTTP ${response.statusCode}: ${JSON.stringify(response.data)}`
         );
       }
 
@@ -91,9 +87,9 @@ export class DeviceAPIService {
         `/devices/${deviceId}/user/project-user-id`
       );
 
-      if (response.status < 200 || response.status >= 300) {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
         throw new Error(
-          `HTTP ${response.status}: ${JSON.stringify(response.data)}`
+          `HTTP ${response.statusCode}: ${JSON.stringify(response.data)}`
         );
       }
 
@@ -121,19 +117,17 @@ export class DeviceAPIService {
       const response = await this.apiClient.post(
         `/devices/${deviceId}/user/properties`,
         {
-          body: {
-            properties: properties.map((p) => ({
-              name: p.name,
-              value_string: p.valueString,
-              type: p.type,
-            })),
-          },
+          properties: properties.map((p) => ({
+            name: p.name,
+            value_string: p.valueString,
+            type: p.type,
+          })),
         }
       );
 
-      if (response.status < 200 || response.status >= 300) {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
         throw new Error(
-          `HTTP ${response.status}: ${JSON.stringify(response.data)}`
+          `HTTP ${response.statusCode}: ${JSON.stringify(response.data)}`
         );
       }
 
@@ -161,15 +155,13 @@ export class DeviceAPIService {
       const response = await this.apiClient.delete(
         `/devices/${deviceId}/user/properties`,
         {
-          queryParameters: {
-            property_names: propertyNames.join(','),
-          },
+          property_names: propertyNames.join(','),
         }
       );
 
-      if (response.status < 200 || response.status >= 300) {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
         throw new Error(
-          `HTTP ${response.status}: ${JSON.stringify(response.data)}`
+          `HTTP ${response.statusCode}: ${JSON.stringify(response.data)}`
         );
       }
 
