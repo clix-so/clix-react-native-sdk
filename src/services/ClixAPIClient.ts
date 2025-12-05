@@ -1,5 +1,7 @@
 import type { ClixConfig } from '../core/ClixConfig';
 import { ClixVersion } from '../core/ClixVersion';
+import { HTTPClient } from '../utils/http/HTTPClient';
+import type { HTTPResponse } from '../utils/http/HTTPResponse';
 import { ClixLogger } from '../utils/logging/ClixLogger';
 
 export interface APIResponse {
@@ -9,9 +11,9 @@ export interface APIResponse {
 }
 
 export class ClixAPIClient {
-  private static readonly API_BASE_PATH = '/api/v1';
-
   constructor(private readonly config: ClixConfig) {}
+
+  private static readonly API_BASE_PATH = '/api/v1';
 
   private async getCommonHeaders(): Promise<Record<string, string>> {
     const version = await ClixVersion.getVersion();
@@ -19,12 +21,9 @@ export class ClixAPIClient {
       'Content-Type': 'application/json',
       'X-Clix-Project-ID': this.config.projectId,
       'X-Clix-API-Key': this.config.apiKey,
-      'User-Agent': `clix-react-native-sdk/${version}`,
+      'User-Agent': `clix-react-native-sdk@${version}`,
+      ...this.config.extraHeaders,
     };
-
-    if (this.config.extraHeaders) {
-      Object.assign(headers, this.config.extraHeaders);
-    }
 
     return headers;
   }
@@ -37,212 +36,153 @@ export class ClixAPIClient {
     return `${baseUrl}${ClixAPIClient.API_BASE_PATH}${fullPath}`;
   }
 
-  private buildUrlWithQuery(
+  async get<T>(
     path: string,
-    queryParameters?: Record<string, any>
-  ): string {
+    params?: Record<string, any>,
+    headers?: Record<string, string>
+  ): Promise<HTTPResponse<T>> {
     const url = this.buildUrl(path);
-
-    if (queryParameters && Object.keys(queryParameters).length > 0) {
-      const searchParams = new URLSearchParams();
-      Object.entries(queryParameters).forEach(([key, value]) => {
-        if (value !== null && value !== undefined) {
-          searchParams.append(key, String(value));
-        }
-      });
-      return `${url}?${searchParams.toString()}`;
-    }
-
-    return url;
-  }
-
-  async get(
-    path: string,
-    options?: {
-      headers?: Record<string, string>;
-      queryParameters?: Record<string, any>;
-    }
-  ): Promise<APIResponse> {
-    const url = this.buildUrlWithQuery(path, options?.queryParameters);
     const commonHeaders = await this.getCommonHeaders();
     const requestHeaders = {
       ...commonHeaders,
-      ...options?.headers,
+      ...headers,
     };
 
     ClixLogger.debug(`API GET ${path}`);
     ClixLogger.debug(`Making request to: ${url}`);
+    if (params && Object.keys(params).length > 0) {
+      ClixLogger.debug(`Query Parameters: ${JSON.stringify(params)}`);
+    }
 
     try {
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: requestHeaders,
-      });
+      const response = await HTTPClient.shared.get<T>(
+        url,
+        params,
+        requestHeaders
+      );
 
-      const data = await this.parseResponse(response);
+      ClixLogger.debug(`Response Status: ${response.statusCode}`);
+      ClixLogger.debug(`Response Body: ${JSON.stringify(response.data)}`);
 
-      ClixLogger.debug(`Response Status: ${response.status}`);
-      ClixLogger.debug(`Response Body: ${JSON.stringify(data)}`);
-
-      return {
-        status: response.status,
-        data,
-        headers: this.headersToRecord(response.headers),
-      };
+      return response;
     } catch (error) {
       ClixLogger.error(`GET ${path} failed`, error);
       throw error;
     }
   }
 
-  async post(
+  async post<T>(
     path: string,
-    options?: {
-      headers?: Record<string, string>;
-      queryParameters?: Record<string, any>;
-      body?: any;
-    }
-  ): Promise<APIResponse> {
-    const url = this.buildUrlWithQuery(path, options?.queryParameters);
+    data?: any,
+    params?: Record<string, any>,
+    headers?: Record<string, string>
+  ): Promise<HTTPResponse<T>> {
+    const url = this.buildUrl(path);
     const commonHeaders = await this.getCommonHeaders();
     const requestHeaders = {
       ...commonHeaders,
-      ...options?.headers,
+      ...headers,
     };
 
     ClixLogger.debug(`API POST ${path}`);
-    if (options?.body) {
-      ClixLogger.debug(`Request Body: ${JSON.stringify(options.body)}`);
+    ClixLogger.debug(`Making request to: ${url}`);
+    if (data) {
+      ClixLogger.debug(`Request Body: ${JSON.stringify(data)}`);
     }
-    if (
-      options?.queryParameters &&
-      Object.keys(options.queryParameters).length > 0
-    ) {
-      ClixLogger.debug(
-        `Query Parameters: ${JSON.stringify(options.queryParameters)}`
-      );
+    if (params && Object.keys(params).length > 0) {
+      ClixLogger.debug(`Query Parameters: ${JSON.stringify(params)}`);
     }
-
-    const body = options?.body ? JSON.stringify(options.body) : undefined;
 
     try {
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: requestHeaders,
-        body,
-      });
-
-      const data = await this.parseResponse(response);
-
-      ClixLogger.debug(`Response Status: ${response.status}`);
-      ClixLogger.debug(`Response Body: ${JSON.stringify(data)}`);
-
-      return {
-        status: response.status,
+      const response = await HTTPClient.shared.post<T>(
+        url,
         data,
-        headers: this.headersToRecord(response.headers),
-      };
+        params,
+        requestHeaders
+      );
+
+      ClixLogger.debug(`Response Status: ${response.statusCode}`);
+      ClixLogger.debug(`Response Body: ${JSON.stringify(response.data)}`);
+
+      return response;
     } catch (error) {
       ClixLogger.error(`POST ${path} failed`, error);
       throw error;
     }
   }
 
-  async put(
+  async put<T>(
     path: string,
-    options?: {
-      headers?: Record<string, string>;
-      queryParameters?: Record<string, any>;
-      body?: any;
-    }
-  ): Promise<APIResponse> {
-    const url = this.buildUrlWithQuery(path, options?.queryParameters);
+    data?: any,
+    params?: Record<string, any>,
+    headers?: Record<string, string>
+  ): Promise<HTTPResponse<T>> {
+    const url = this.buildUrl(path);
     const commonHeaders = await this.getCommonHeaders();
     const requestHeaders = {
       ...commonHeaders,
-      ...options?.headers,
+      ...headers,
     };
 
     ClixLogger.debug(`API PUT ${path}`);
-
-    const body = options?.body ? JSON.stringify(options.body) : undefined;
+    ClixLogger.debug(`Making request to: ${url}`);
+    if (data) {
+      ClixLogger.debug(`Request Body: ${JSON.stringify(data)}`);
+    }
+    if (params && Object.keys(params).length > 0) {
+      ClixLogger.debug(`Query Parameters: ${JSON.stringify(params)}`);
+    }
 
     try {
-      const response = await fetch(url, {
-        method: 'PUT',
-        headers: requestHeaders,
-        body,
-      });
-
-      const data = await this.parseResponse(response);
-
-      ClixLogger.debug(`Response Status: ${response.status}`);
-      ClixLogger.debug(`Response Body: ${JSON.stringify(data)}`);
-
-      return {
-        status: response.status,
+      const response = await HTTPClient.shared.put<T>(
+        url,
         data,
-        headers: this.headersToRecord(response.headers),
-      };
+        params,
+        requestHeaders
+      );
+
+      ClixLogger.debug(`Response Status: ${response.statusCode}`);
+      ClixLogger.debug(`Response Body: ${JSON.stringify(response.data)}`);
+
+      return response;
     } catch (error) {
       ClixLogger.error(`PUT ${path} failed`, error);
       throw error;
     }
   }
 
-  async delete(
+  async delete<T>(
     path: string,
-    options?: {
-      headers?: Record<string, string>;
-      queryParameters?: Record<string, any>;
-    }
-  ): Promise<APIResponse> {
-    const url = this.buildUrlWithQuery(path, options?.queryParameters);
+    params?: Record<string, any>,
+    headers?: Record<string, string>
+  ): Promise<HTTPResponse<T>> {
+    const url = this.buildUrl(path);
     const commonHeaders = await this.getCommonHeaders();
     const requestHeaders = {
       ...commonHeaders,
-      ...options?.headers,
+      ...headers,
     };
 
     ClixLogger.debug(`API DELETE ${path}`);
+    ClixLogger.debug(`Making request to: ${url}`);
+    if (params && Object.keys(params).length > 0) {
+      ClixLogger.debug(`Query Parameters: ${JSON.stringify(params)}`);
+    }
 
     try {
-      const response = await fetch(url, {
-        method: 'DELETE',
-        headers: requestHeaders,
-      });
+      const response = await HTTPClient.shared.delete<T>(
+        url,
+        params,
+        requestHeaders
+      );
 
-      const data = await this.parseResponse(response);
+      ClixLogger.debug(`Response Status: ${response.statusCode}`);
+      ClixLogger.debug(`Response Body: ${JSON.stringify(response.data)}`);
 
-      ClixLogger.debug(`Response Status: ${response.status}`);
-      ClixLogger.debug(`Response Body: ${JSON.stringify(data)}`);
-
-      return {
-        status: response.status,
-        data,
-        headers: this.headersToRecord(response.headers),
-      };
+      return response;
     } catch (error) {
       ClixLogger.error(`DELETE ${path} failed`, error);
       throw error;
     }
-  }
-
-  private async parseResponse(response: Response): Promise<any> {
-    const contentType = response.headers.get('content-type');
-
-    if (contentType && contentType.includes('application/json')) {
-      return await response.json();
-    }
-
-    return await response.text();
-  }
-
-  private headersToRecord(headers: Headers): Record<string, string> {
-    const record: Record<string, string> = {};
-    headers.forEach((value: any, key: string) => {
-      record[key] = value;
-    });
-    return record;
   }
 }

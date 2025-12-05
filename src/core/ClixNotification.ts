@@ -1,9 +1,10 @@
 import { type NotificationSettings } from '@notifee/react-native';
 import type {
   BackgroundMessageHandler,
-  FcmTokenErrorHandler,
-  ForegroundMessageHandler,
-  NotificationOpenedHandler,
+  ForegroundEventHandler,
+  MessageHandler,
+  NotificationOpenedAppHandler,
+  TokenRefreshHandler,
 } from '../services/NotificationService';
 import { ClixLogger } from '../utils/logging/ClixLogger';
 import { Clix } from './Clix';
@@ -34,7 +35,7 @@ export class ClixNotification {
         return;
       }
 
-      notificationService.setAutoHandleLandingUrl(autoHandleLandingURL);
+      notificationService.autoHandleLandingUrl = autoHandleLandingURL;
 
       if (autoRequestPermission) {
         await notificationService.requestPermission();
@@ -44,32 +45,22 @@ export class ClixNotification {
     }
   }
 
-  async requestPermission(): Promise<NotificationSettings | null> {
+  async requestPermission(): Promise<NotificationSettings | undefined> {
     try {
       await Clix.initCoordinator.waitForInitialization();
-      const notificationService = Clix.shared?.notificationService;
-      if (!notificationService) {
-        ClixLogger.warn('Notification service is not initialized');
-        return null;
-      }
-
-      return await notificationService.requestPermission();
+      return await Clix.shared?.notificationService?.requestPermission();
     } catch (error) {
       ClixLogger.error('Failed to request notification permission', error);
-      return null;
+      return undefined;
     }
   }
 
   async setPermissionGranted(isGranted: boolean): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
-      const notificationService = Clix.shared?.notificationService;
-      if (!notificationService) {
-        ClixLogger.warn('Notification service is not initialized');
-        return;
-      }
-
-      await notificationService.setPermissionGranted(isGranted);
+      return await Clix.shared?.notificationService?.setPermissionGranted(
+        isGranted
+      );
     } catch (error) {
       ClixLogger.error(
         'Failed to update push permission status on server',
@@ -81,21 +72,14 @@ export class ClixNotification {
   async getToken(): Promise<string | undefined> {
     try {
       await Clix.initCoordinator.waitForInitialization();
-      const notificationService = Clix.shared?.notificationService;
-      if (!notificationService) {
-        ClixLogger.warn('Notification service is not initialized');
-        return undefined;
-      }
-
-      const token = await notificationService.getCurrentToken();
-      return token ?? undefined;
+      return Clix.shared?.tokenService?.getCurrentToken();
     } catch (error) {
       ClixLogger.error('Failed to get push token', error);
       return undefined;
     }
   }
 
-  async onMessage(handler?: ForegroundMessageHandler): Promise<void> {
+  async onMessage(handler?: MessageHandler): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
       const notificationService = Clix.shared?.notificationService;
@@ -103,7 +87,7 @@ export class ClixNotification {
         ClixLogger.warn('Notification service is not initialized');
         return;
       }
-      notificationService.setMessageHandler(handler);
+      notificationService.messageHandler = handler;
     } catch (error) {
       ClixLogger.error('Failed to register onMessage handler', error);
     }
@@ -117,14 +101,14 @@ export class ClixNotification {
         ClixLogger.warn('Notification service is not initialized');
         return;
       }
-      notificationService.setBackgroundMessageHandler(handler);
+      notificationService.backgroundMessageHandler = handler;
     } catch (error) {
       ClixLogger.error('Failed to register onBackgroundMessage handler', error);
     }
   }
 
-  async onNotificationOpened(
-    handler?: NotificationOpenedHandler
+  async onNotificationOpenedApp(
+    handler?: NotificationOpenedAppHandler
   ): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
@@ -133,7 +117,7 @@ export class ClixNotification {
         ClixLogger.warn('Notification service is not initialized');
         return;
       }
-      notificationService.setNotificationOpenedHandler(handler);
+      notificationService.notificationOpenedAppHandler = handler;
     } catch (error) {
       ClixLogger.error(
         'Failed to register onNotificationOpened handler',
@@ -141,7 +125,8 @@ export class ClixNotification {
       );
     }
   }
-  async onFcmTokenError(handler?: FcmTokenErrorHandler): Promise<void> {
+
+  async onTokenRefresh(handler?: TokenRefreshHandler): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
       const notificationService = Clix.shared?.notificationService;
@@ -149,9 +134,23 @@ export class ClixNotification {
         ClixLogger.warn('Notification service is not initialized');
         return;
       }
-      notificationService.setFcmTokenErrorHandler(handler);
+      notificationService.tokenRefreshHandler = handler;
     } catch (error) {
-      ClixLogger.error('Failed to register onFcmTokenError handler', error);
+      ClixLogger.error('Failed to register onTokenRefresh handler', error);
+    }
+  }
+
+  async onForegroundEvent(handler?: ForegroundEventHandler): Promise<void> {
+    try {
+      await Clix.initCoordinator.waitForInitialization();
+      const notificationService = Clix.shared?.notificationService;
+      if (!notificationService) {
+        ClixLogger.warn('Notification service is not initialized');
+        return;
+      }
+      notificationService.foregroundEventHandler = handler;
+    } catch (error) {
+      ClixLogger.error('Failed to register onForegroundEvent handler', error);
     }
   }
 }

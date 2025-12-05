@@ -1,5 +1,4 @@
 import { ClixDateFormatter } from '../utils/ClixDateFormatter';
-import { ClixLogger } from '../utils/logging/ClixLogger';
 import { DeviceService } from './DeviceService';
 import { EventAPIService } from './EventAPIService';
 
@@ -9,6 +8,23 @@ export class EventService {
     private readonly deviceService: DeviceService
   ) {}
 
+  private serializeProperties(
+    properties: Record<string, any> = {}
+  ): Record<string, any> {
+    const cleanProperties: Record<string, any> = {};
+
+    Object.entries(properties).forEach(([key, value]) => {
+      if (value instanceof Date) {
+        cleanProperties[key] = ClixDateFormatter.format(value);
+        return;
+      }
+
+      cleanProperties[key] = value;
+    });
+
+    return cleanProperties;
+  }
+
   async trackEvent(
     name: string,
     properties?: Record<string, any>,
@@ -16,38 +32,15 @@ export class EventService {
     userJourneyId?: string,
     userJourneyNodeId?: string
   ): Promise<void> {
-    try {
-      ClixLogger.debug(`Tracking event: ${name}`);
+    const deviceId = this.deviceService.getCurrentDeviceId();
 
-      const deviceId = this.deviceService.getCurrentDeviceId();
-
-      const cleanProperties: Record<string, any> = {};
-      if (properties) {
-        Object.entries(properties).forEach(([key, value]) => {
-          if (value instanceof Date) {
-            cleanProperties[key] = ClixDateFormatter.format(value);
-            return;
-          }
-
-          cleanProperties[key] = value;
-        });
-      }
-
-      await this.eventAPIService.trackEvent(
-        deviceId,
-        name,
-        cleanProperties,
-        messageId,
-        userJourneyId,
-        userJourneyNodeId
-      );
-
-      ClixLogger.debug(`Event tracked successfully: ${name}`);
-    } catch (error) {
-      ClixLogger.error(
-        `Failed to track event '${name}': ${error}. Make sure Clix.initialize() has been called.`
-      );
-      throw error;
-    }
+    await this.eventAPIService.trackEvent(
+      deviceId,
+      name,
+      this.serializeProperties(properties),
+      messageId,
+      userJourneyId,
+      userJourneyNodeId
+    );
   }
 }

@@ -27,14 +27,12 @@ export class EventAPIService {
       };
 
       const response = await this.apiClient.post('/events', {
-        body: {
-          events: [eventRequestBody],
-        },
+        events: [eventRequestBody],
       });
 
-      if (response.status < 200 || response.status >= 300) {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
         throw new Error(
-          `HTTP ${response.status}: ${JSON.stringify(response.data)}`
+          `HTTP ${response.statusCode}: ${JSON.stringify(response.data)}`
         );
       }
 
