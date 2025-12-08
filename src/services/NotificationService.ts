@@ -44,6 +44,7 @@ export class NotificationService {
   foregroundEventHandler?: ForegroundEventHandler;
 
   private isInitialized = false;
+  private processedMessageIds = new Set<string>();
   private unsubscribeMessage?: () => void;
   private unsubscribeNotificationOpenedApp?: () => void;
   private unsubscribeTokenRefresh?: () => void;
@@ -97,6 +98,7 @@ export class NotificationService {
     this.unsubscribeTokenRefresh?.();
     this.unsubscribeForegroundEvent?.();
     this.isInitialized = false;
+    this.processedMessageIds.clear();
     ClixLogger.debug('Notification service cleaned up');
   }
 
@@ -244,6 +246,20 @@ export class NotificationService {
   ): Promise<void> {
     ClixLogger.debug('Handling foreground message:', remoteMessage.messageId);
 
+    const messageId = remoteMessage.messageId;
+    if (!messageId) {
+      ClixLogger.warn('No messageId found in foreground message');
+      return;
+    }
+
+    if (this.processedMessageIds.has(messageId)) {
+      ClixLogger.debug(
+        'Message already processed, skipping duplicate:',
+        messageId
+      );
+      return;
+    }
+
     const data = remoteMessage.data ?? {};
     try {
       const result = await this.messageHandler?.(data);
@@ -264,6 +280,8 @@ export class NotificationService {
         ClixLogger.warn('No Clix payload found in background message');
         return;
       }
+
+      this.processedMessageIds.add(messageId);
 
       if (Platform.OS === 'android') {
         // NOTE(nyanxyz): on iOS, Received event is tracked in Notification Service Extension

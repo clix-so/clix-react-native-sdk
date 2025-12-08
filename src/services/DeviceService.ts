@@ -11,7 +11,7 @@ import type { TokenService } from './TokenService';
 
 export class DeviceService {
   private deviceIdKey = 'clix_device_id';
-  private device?: ClixDevice;
+  private currentDevice?: ClixDevice;
 
   constructor(
     private readonly storageService: StorageService,
@@ -20,8 +20,8 @@ export class DeviceService {
   ) {}
 
   async initialize(): Promise<void> {
-    this.device = await this.createDevice();
-    await this.deviceAPIService.upsertDevice(this.device);
+    this.currentDevice = await this.createDevice();
+    await this.deviceAPIService.upsertDevice(this.currentDevice);
   }
 
   private generateDeviceId(): string {
@@ -92,44 +92,42 @@ export class DeviceService {
     pushToken: string,
     pushTokenType: string
   ): Promise<void> {
-    const device = this.device;
-
-    if (!device) {
+    if (!this.currentDevice) {
       ClixLogger.warn('Device not initialized yet, cannot update push token');
       return;
     }
 
     if (
-      device.pushToken === pushToken &&
-      device.pushTokenType === pushTokenType
+      this.currentDevice.pushToken === pushToken &&
+      this.currentDevice.pushTokenType === pushTokenType
     ) {
       ClixLogger.debug('Push token and type are unchanged, skipping update');
       return;
     }
 
-    const newDevice = device.copyWith({ pushToken, pushTokenType });
-    this.device = newDevice;
+    const newDevice = this.currentDevice.copyWith({ pushToken, pushTokenType });
+    this.currentDevice = newDevice;
 
     return this.deviceAPIService.upsertDevice(newDevice);
   }
 
   async updatePushPermission(isGranted: boolean): Promise<void> {
-    const device = this.device;
-
-    if (!device) {
+    if (!this.currentDevice) {
       ClixLogger.warn(
         'Device not initialized yet, cannot update push permission status'
       );
       return;
     }
 
-    if (device.isPushPermissionGranted === isGranted) {
+    if (this.currentDevice.isPushPermissionGranted === isGranted) {
       ClixLogger.debug('Push permission status is unchanged, skipping update');
       return;
     }
 
-    const newDevice = device.copyWith({ isPushPermissionGranted: isGranted });
-    this.device = newDevice;
+    const newDevice = this.currentDevice.copyWith({
+      isPushPermissionGranted: isGranted,
+    });
+    this.currentDevice = newDevice;
 
     return this.deviceAPIService.upsertDevice(newDevice);
   }
