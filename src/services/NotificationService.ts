@@ -76,7 +76,7 @@ export class NotificationService {
       ClixLogger.debug('Initializing notification service...');
 
       this.setupTokenRefreshListener();
-      this.setupPushReceivedHandler();
+      this.setupPushReceivedHandler(); // NOTE(nyanxyz): must be set up before any await calls
       await this.setupPushTappedHandler();
 
       if (Platform.OS === 'android') {

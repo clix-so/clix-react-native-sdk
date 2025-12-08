@@ -70,12 +70,9 @@ export class Clix {
         this.shared.eventService
       );
 
-      await this.shared.notificationService.initialize();
-
       this.shared.storageService.set(this.configKey, config);
-
-      const device = await this.shared.deviceService.createDevice();
-      await this.shared.deviceService.upsertDevice(device);
+      await this.shared.notificationService.initialize(); // NOTE(nyanxyz): must be initialized before any await calls
+      await this.shared.deviceService.initialize();
 
       ClixLogger.debug('Clix SDK initialized successfully');
       this.initCoordinator.completeInitialization();

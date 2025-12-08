@@ -11,13 +11,18 @@ import type { TokenService } from './TokenService';
 
 export class DeviceService {
   private deviceIdKey = 'clix_device_id';
-  private cachedDevice: ClixDevice | null = null;
+  private device?: ClixDevice;
 
   constructor(
     private readonly storageService: StorageService,
     private readonly tokenService: TokenService,
     private readonly deviceAPIService: DeviceAPIService
   ) {}
+
+  async initialize(): Promise<void> {
+    this.device = await this.createDevice();
+    await this.deviceAPIService.upsertDevice(this.device);
+  }
 
   private generateDeviceId(): string {
     return UUID.generate();
@@ -37,10 +42,6 @@ export class DeviceService {
   }
 
   async createDevice(): Promise<ClixDevice> {
-    if (this.cachedDevice) {
-      return this.cachedDevice;
-    }
-
     const deviceId = this.getCurrentDeviceId();
     const platform = DeviceInfo.getSystemName();
     const osName = DeviceInfo.getSystemName();
@@ -79,7 +80,6 @@ export class DeviceService {
       pushToken,
       pushTokenType,
     });
-    this.cachedDevice = device;
 
     return device;
   }
@@ -92,7 +92,13 @@ export class DeviceService {
     pushToken: string,
     pushTokenType: string
   ): Promise<void> {
-    const device = await this.createDevice();
+    const device = this.device;
+
+    if (!device) {
+      ClixLogger.warn('Device not initialized yet, cannot update push token');
+      return;
+    }
+
     if (
       device.pushToken === pushToken &&
       device.pushTokenType === pushTokenType
@@ -101,20 +107,31 @@ export class DeviceService {
       return;
     }
 
-    device.pushToken = pushToken;
-    device.pushTokenType = pushTokenType;
-    return this.deviceAPIService.upsertDevice(device);
+    const newDevice = device.copyWith({ pushToken, pushTokenType });
+    this.device = newDevice;
+
+    return this.deviceAPIService.upsertDevice(newDevice);
   }
 
   async updatePushPermission(isGranted: boolean): Promise<void> {
-    const device = await this.createDevice();
+    const device = this.device;
+
+    if (!device) {
+      ClixLogger.warn(
+        'Device not initialized yet, cannot update push permission status'
+      );
+      return;
+    }
+
     if (device.isPushPermissionGranted === isGranted) {
       ClixLogger.debug('Push permission status is unchanged, skipping update');
       return;
     }
 
-    device.isPushPermissionGranted = isGranted;
-    return this.deviceAPIService.upsertDevice(device);
+    const newDevice = device.copyWith({ isPushPermissionGranted: isGranted });
+    this.device = newDevice;
+
+    return this.deviceAPIService.upsertDevice(newDevice);
   }
 
   async setProjectUserId(projectUserId: string): Promise<void> {
