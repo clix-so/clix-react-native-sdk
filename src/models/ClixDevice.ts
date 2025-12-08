@@ -1,21 +1,21 @@
 export class ClixDevice {
-  public readonly id: string;
-  public readonly platform: string;
-  public readonly model: string;
-  public readonly manufacturer: string;
-  public readonly osName: string;
-  public readonly osVersion: string;
-  public readonly localeRegion: string;
-  public readonly localeLanguage: string;
-  public readonly timezone: string;
-  public readonly appName: string;
-  public readonly appVersion: string;
-  public readonly sdkType: string;
-  public readonly sdkVersion: string;
-  public readonly adId?: string;
-  public readonly isPushPermissionGranted: boolean;
-  public readonly pushToken?: string;
-  public readonly pushTokenType?: string;
+  readonly id: string;
+  readonly platform: string;
+  readonly model: string;
+  readonly manufacturer: string;
+  readonly osName: string;
+  readonly osVersion: string;
+  readonly localeRegion: string;
+  readonly localeLanguage: string;
+  readonly timezone: string;
+  readonly appName: string;
+  readonly appVersion: string;
+  readonly sdkType: string;
+  readonly sdkVersion: string;
+  readonly adId?: string;
+  readonly isPushPermissionGranted: boolean;
+  readonly pushToken?: string;
+  readonly pushTokenType?: string;
 
   constructor(device: {
     id: string;
@@ -76,13 +76,5 @@ export class ClixDevice {
       pushToken: updates.pushToken ?? this.pushToken,
       pushTokenType: updates.pushTokenType ?? this.pushTokenType,
     });
-  }
-
-  equals(other: ClixDevice): boolean {
-    return this.id === other.id;
-  }
-
-  toString(): string {
-    return `ClixDevice(id: ${this.id}, platform: ${this.platform}, model: ${this.model})`;
   }
 }
