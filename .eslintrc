@@ -5,9 +5,12 @@
   "parserOptions": {
     "warnOnUnsupportedTypeScriptVersion": false
   },
+  "globals": {
+    "AbortController": "readonly"
+  },
   "rules": {
     "react/react-in-jsx-scope": "off",
     "prettier/prettier": "error"
   },
   "ignorePatterns": ["node_modules/", "lib/"]
-} 
+}

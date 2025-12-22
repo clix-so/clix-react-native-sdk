@@ -1,3 +1,4 @@
+import { ClixLogger } from '../logging/ClixLogger';
 import { HTTPMethod } from './HTTPMethod';
 import type { HTTPRequest } from './HTTPRequest';
 import type { HTTPResponse } from './HTTPResponse';
@@ -6,9 +7,19 @@ export class HTTPClient {
   static shared = new HTTPClient();
 
   async request<T>(request: HTTPRequest): Promise<HTTPResponse<T>> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      ClixLogger.warn(`HTTP request to ${request.url} timed out after 2000ms`);
+      controller.abort();
+    }, 2000);
+
     const url = this.buildUrlWithParams(request.url, request.params);
     const headers = { ...(request.headers || {}) };
-    const init: RequestInit = { method: request.method, headers };
+    const init: RequestInit = {
+      method: request.method,
+      headers,
+      signal: controller.signal,
+    };
 
     const body = this.prepareBody(request.data);
     if (
@@ -21,6 +32,8 @@ export class HTTPClient {
 
     const response = await fetch(url, init);
     const data = await this.parseResponse<T>(response);
+
+    clearTimeout(timeoutId);
 
     return {
       data,
