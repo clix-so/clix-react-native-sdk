@@ -1,0 +1,1 @@
+{"version":3,"file":"ClixVersion.d.ts","sourceRoot":"","sources":["../../../../src/core/ClixVersion.ts"],"names":[],"mappings":"AAAA,qBAAa,WAAW;IACtB,OAAO,CAAC,MAAM,CAAC,aAAa,CAAC,CAAS;IACtC,OAAO,CAAC,MAAM,CAAC,eAAe,CAAmB;WAEpC,UAAU,IAAI,OAAO,CAAC,MAAM,CAAC;CAY3C"}
