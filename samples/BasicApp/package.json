@@ -15,7 +15,7 @@
     "build:ios": "react-native build-ios --mode Debug"
   },
   "dependencies": {
-    "@clix-so/react-native-sdk": "github:clix-so/clix-react-native-sdk#tiro-1222",
+    "@clix-so/react-native-sdk": "file:../..",
     "@notifee/react-native": "9.1.8",
     "@react-native-firebase/app": "19.3.0",
     "@react-native-firebase/messaging": "19.3.0",

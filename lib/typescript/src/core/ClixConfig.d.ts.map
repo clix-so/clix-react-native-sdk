@@ -1,1 +1,0 @@
-{"version":3,"file":"ClixConfig.d.ts","sourceRoot":"","sources":["../../../../src/core/ClixConfig.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,YAAY,EAAE,MAAM,6BAA6B,CAAC;AAE3D,MAAM,WAAW,UAAU;IACzB,SAAS,EAAE,MAAM,CAAC;IAClB,MAAM,EAAE,MAAM,CAAC;IACf,QAAQ,EAAE,MAAM,CAAC;IACjB,QAAQ,EAAE,YAAY,CAAC;IACvB,YAAY,EAAE,MAAM,CAAC,MAAM,EAAE,MAAM,CAAC,CAAC;CACtC"}
