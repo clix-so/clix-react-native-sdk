@@ -214,8 +214,6 @@ export class NotificationService {
   ): Promise<void> {
     ClixLogger.debug('Handling background message:', remoteMessage.messageId);
 
-    setTimeout(() => ClixLogger.debug('still alive after 3s'), 3000);
-
     const data = remoteMessage.data ?? {};
     try {
       await this.backgroundMessageHandler?.(data);
