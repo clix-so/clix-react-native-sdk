@@ -1,14 +1,14 @@
 <!-- repo: clix-so/clix-react-native-sdk -->
 <!-- ref: main -->
-<!-- commit: b3f606e3795a89b6b78604f16c3a8047d3fa40ad -->
-<!-- generated_at: 2025-12-08T07:47:02Z -->
+<!-- commit: d433587cbd08a14a6e538ae1bfa5dad7ba82d82f -->
+<!-- generated_at: 2025-12-23T06:33:16Z -->
 # Platform: React Native
 
 ## /
 - [Readme](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/README.md): Developer-facing README detailing installation, peer dependencies, React Native/Firebase setup, Clix initialization (`Clix.initialize`), user management APIs, notification handling via `NotificationService.
-- [Changelog](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/CHANGELOG.md): Semver-based changelog recording release notes and notable changes (v1.1.
+- [Changelog](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/CHANGELOG.md): CHANGELOG.md provides semantic-versioned release notes and migration-impacting details for the React Native SDK—including ClixConfig initialization, trackEvent and Clix.
 - [License](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/LICENSE): Defines the SDK’s modified MIT license, granting standard use/modify/distribute rights but legally restricting all substantial use to Clix services and disallowing repurposing for unrelated platforms without explicit permission.
-- [Package](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/package.json): package.json for @clix-so/react-native-sdk: declares entrypoints (source.
+- [Package](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/package.json): Package manifest for @clix-so/react-native-sdk: declares main/types/exports (./lib/module/index.
 - [Tsconfig](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/tsconfig.json): TypeScript compiler configuration enforcing strict type-safety and noEmit, React JSX and bundler moduleResolution, mapping package alias @clix-so/react-native-sdk →./src/index, targeting ESNext with noUnused/noUnchecked checks and resolveJsonModule for build/IDE tooling.
 - [Tsconfig.build](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/tsconfig.build.json): TypeScript build configuration that extends the base `tsconfig`, excluding `samples` and compiled `lib` output from the build to control which source files are processed and emitted.
 - [Babel.config](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/babel.config.js): Configures Babel to use `react-native-builder-bob` presets for the SDK source and `@react-native/babel-preset` for `node_modules`, ensuring correct transpilation behavior for library code versus external dependencies.
@@ -46,7 +46,7 @@
 - [Clixdevice](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/src/models/ClixDevice.ts): ClixDevice is an immutable TypeScript model with readonly properties encapsulating device/app/sdk metadata (IDs, platform/model/manufacturer, OS, locale, timezone, app/sdk versions, adId, push permission/token), exposing a constructor and copyWith(updates: Partial<ClixDevice>) to produce updated instances.
 
 ## src/services
-- [Notificationservice](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/src/services/NotificationService.ts): NotificationService initializes notifee and Firebase Messaging handlers, creates Android channel, displays parsed Clix notifications (and opens landing URLs), tracks PUSH_NOTIFICATION_RECEIVED/TAPPED via EventService, updates push permission/token via DeviceService/TokenService, and exposes initialize/cleanup/requestPermission plus handler hooks.
+- [Notificationservice](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/src/services/NotificationService.ts): NotificationService exposes initialize/cleanup/requestPermission and handler callbacks, wires @notifee and @react-native-firebase/messaging to set up listeners, manage FCM token refresh, parse Clix payloads, display notifications, open landing URLs, track push events via EventService, and update DeviceService/TokenService.
 - [Deviceservice](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/src/services/DeviceService.ts): DeviceService manages local device identity and ClixDevice creation (using react-native-device-info, Firebase Messaging, ClixVersion), persists/generated device ID via StorageService, saves FCM token via TokenService, and upserts device/user properties through DeviceAPIService via public APIs: initialize, createDevice, updatePushToken/Permission, set/removeProjectUserId, update/removeUserProperties.
 - [Tokenservice](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/src/services/TokenService.ts): TokenService wraps a StorageService to persist and retrieve the current push token under key 'clix_current_push_token', exposing constructor(storageService), getCurrentToken(): string|undefined and saveToken(token): void.
 - [Storageservice](https://raw.githubusercontent.com/clix-so/clix-react-native-sdk/main/src/services/StorageService.ts): StorageService wraps react-native-mmkv (v2/v3/v4), providing multi-process, App Group path-aware MMKV initialization (per-project id), JSON-encoded set/get with legacy string migration, remove/clear/getAllKeys utilities, and resilient error logging via ClixLogger.
