@@ -41,6 +41,19 @@ jobs:
 
           echo "Version validation passed: $INPUT_VERSION"
 
+      - name: Determine version metadata
+        id: version_metadata
+        run: |
+          VERSION="${{ github.event.inputs.version }}"
+
+          if [[ "$VERSION" == *"beta"* ]]; then
+            echo "is_beta=true" >> "$GITHUB_OUTPUT"
+            echo "dist_tag=beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_beta=false" >> "$GITHUB_OUTPUT"
+            echo "dist_tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Install dependencies
         run: npm ci
 
@@ -52,7 +65,7 @@ jobs:
 
       - name: Read Changelog
         id: read_changelog
-        if: ${{ !contains(github.event.inputs.version, 'SNAPSHOT') && !contains(github.event.inputs.version, 'beta') }}
+        if: ${{ steps.version_metadata.outputs.is_beta != 'true' }}
         uses: mindsers/changelog-reader-action@v2
         with:
           version: ${{ github.event.inputs.version }}
@@ -68,7 +81,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Release to npm
-        run: npm publish --provenance --access public
+        run: npm publish --provenance --access public --tag ${{ steps.version_metadata.outputs.dist_tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
