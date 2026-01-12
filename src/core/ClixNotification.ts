@@ -1,5 +1,6 @@
 import { type NotificationSettings } from '@notifee/react-native';
 import type {
+  BackgroundEventHandler,
   BackgroundMessageHandler,
   ForegroundEventHandler,
   MessageHandler,
@@ -151,6 +152,20 @@ export class ClixNotification {
       notificationService.foregroundEventHandler = handler;
     } catch (error) {
       ClixLogger.error('Failed to register onForegroundEvent handler', error);
+    }
+  }
+
+  async onBackgroundEvent(handler?: BackgroundEventHandler): Promise<void> {
+    try {
+      await Clix.initCoordinator.waitForInitialization();
+      const notificationService = Clix.shared?.notificationService;
+      if (!notificationService) {
+        ClixLogger.warn('Notification service is not initialized');
+        return;
+      }
+      notificationService.backgroundEventHandler = handler;
+    } catch (error) {
+      ClixLogger.error('Failed to register onBackgroundEvent handler', error);
     }
   }
 }

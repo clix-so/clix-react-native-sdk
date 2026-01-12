@@ -34,6 +34,7 @@ export type NotificationOpenedAppHandler = (
 ) => Promise<void> | void;
 export type TokenRefreshHandler = (token: string) => Promise<void> | void;
 export type ForegroundEventHandler = (event: Event) => Promise<void> | void;
+export type BackgroundEventHandler = (event: Event) => Promise<void> | void;
 
 export class NotificationService {
   autoHandleLandingUrl = true;
@@ -42,6 +43,7 @@ export class NotificationService {
   notificationOpenedAppHandler?: NotificationOpenedAppHandler;
   tokenRefreshHandler?: TokenRefreshHandler;
   foregroundEventHandler?: ForegroundEventHandler;
+  backgroundEventHandler?: BackgroundEventHandler;
 
   private isInitialized = false;
   private processedMessageIds = new Set<string>();
@@ -158,7 +160,9 @@ export class NotificationService {
      * Android: background notification tap handler
      *          & app launched from quit state via a notification
      */
-    notifee.onBackgroundEvent(this.handleNotificationEvent.bind(this));
+    notifee.onBackgroundEvent(
+      this.handleBackgroundNotificationEvent.bind(this)
+    );
     /**
      * iOS & Android: foreground notification tap handler
      */
@@ -389,6 +393,19 @@ export class NotificationService {
       await this.foregroundEventHandler?.(event);
     } catch (error) {
       ClixLogger.error('Foreground notification event handler failed', error);
+    }
+
+    await this.handleNotificationEvent(event);
+  }
+
+  /**
+   * Android: background notification tap handler (wrapper for user handler + SDK handler)
+   */
+  private async handleBackgroundNotificationEvent(event: Event): Promise<void> {
+    try {
+      await this.backgroundEventHandler?.(event);
+    } catch (error) {
+      ClixLogger.error('Background notification event handler failed', error);
     }
 
     await this.handleNotificationEvent(event);
