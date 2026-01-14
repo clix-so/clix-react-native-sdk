@@ -84,5 +84,8 @@ nitrogen/
 GoogleService-Info.plist
 google-services.json
 
+# Clix Configuration
+clix_config.json
+
 # npm pack
 clix-so-react-native-sdk-*.tgz
