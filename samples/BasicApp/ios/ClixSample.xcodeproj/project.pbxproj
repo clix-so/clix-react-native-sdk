@@ -14,7 +14,7 @@
 		50BB11BFC8E946A4DDFB20D7 /* Pods_ClixNotificationExtension.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = DE11C90CADA72E192D0CC012 /* Pods_ClixNotificationExtension.framework */; };
 		5872AEF329147C39E6705487 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB81A68108700A75B9A /* PrivacyInfo.xcprivacy */; };
 		7F8401782ED6C18100AD7282 /* ClixNotificationExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 7F8401712ED6C18100AD7282 /* ClixNotificationExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		7FADBC862F177B740065D721 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7FADBC852F177B740065D721 /* GoogleService-Info.plist */; };
+		7FADBCE82F178B530065D721 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = 7FADBC852F177B740065D721 /* GoogleService-Info.plist */; };
 		7FE86EA72EE2BE9700770E2D /* clix_config.json in Resources */ = {isa = PBXBuildFile; fileRef = 7FE86EA62EE2BE9700770E2D /* clix_config.json */; };
 		81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 81AB9BB72411601600AC10FF /* LaunchScreen.storyboard */; };
 		CA84F06BEBBB6552B1525D25 /* Pods_ClixSample.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6790C6F16846C484C39C88D4 /* Pods_ClixSample.framework */; };
@@ -276,6 +276,7 @@
 			files = (
 				81AB9BB82411601600AC10FF /* LaunchScreen.storyboard in Resources */,
 				4831C7742E17B74800716C37 /* GoogleService-Info.plist in Resources */,
+				7FADBCE82F178B530065D721 /* GoogleService-Info.plist in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				5872AEF329147C39E6705487 /* PrivacyInfo.xcprivacy in Resources */,
 			);
@@ -286,7 +287,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				7FE86EA72EE2BE9700770E2D /* clix_config.json in Resources */,
-				7FADBC862F177B740065D721 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -472,7 +472,7 @@
 				DEVELOPMENT_TEAM = MR367J8PMN;
 				ENABLE_BITCODE = NO;
 				INFOPLIST_FILE = ClixSample/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -501,7 +501,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = MR367J8PMN;
 				INFOPLIST_FILE = ClixSample/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 14;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.6;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
