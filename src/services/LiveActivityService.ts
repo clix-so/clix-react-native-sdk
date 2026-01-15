@@ -49,7 +49,7 @@ export class LiveActivityService {
 
       const deviceId = this.deviceService.getCurrentDeviceId();
 
-      await this.liveActivityAPIService.setPushToStartToken(
+      await this.liveActivityAPIService.registerLiveActivityStartToken(
         deviceId,
         event.activityType,
         event.token

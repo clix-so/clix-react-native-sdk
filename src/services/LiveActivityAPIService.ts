@@ -4,14 +4,14 @@ import { ClixAPIClient } from './ClixAPIClient';
 export class LiveActivityAPIService {
   constructor(private readonly apiClient: ClixAPIClient) {}
 
-  async setPushToStartToken(
+  async registerLiveActivityStartToken(
     deviceId: string,
     activityType: string,
     token: string
   ): Promise<void> {
     try {
       ClixLogger.debug(
-        `Setting pushToStartToken for device: ${deviceId}, activityType: ${activityType}`
+        `Registering liveActivityStartToken for device: ${deviceId}, activityType: ${activityType}`
       );
 
       const response = await this.apiClient.post(
