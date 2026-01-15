@@ -3,6 +3,8 @@ import { DeviceAPIService } from '../services/DeviceAPIService';
 import { DeviceService } from '../services/DeviceService';
 import { EventAPIService } from '../services/EventAPIService';
 import { EventService } from '../services/EventService';
+import { LiveActivityAPIService } from '../services/LiveActivityAPIService';
+import { LiveActivityService } from '../services/LiveActivityService';
 import { NotificationService } from '../services/NotificationService';
 import { StorageService } from '../services/StorageService';
 import { TokenService } from '../services/TokenService';
@@ -28,6 +30,7 @@ export class Clix {
   eventService?: EventService;
   deviceService?: DeviceService;
   notificationService?: NotificationService;
+  liveActivityService?: LiveActivityService;
 
   private static configKey = 'clix_config';
 
@@ -52,6 +55,7 @@ export class Clix {
       const apiClient = new ClixAPIClient(config);
       const deviceApiService = new DeviceAPIService(apiClient);
       const eventApiService = new EventAPIService(apiClient);
+      const liveActivityApiService = new LiveActivityAPIService(apiClient);
 
       this.shared.storageService = new StorageService(config.projectId);
       this.shared.tokenService = new TokenService(this.shared.storageService);
@@ -69,8 +73,13 @@ export class Clix {
         this.shared.tokenService,
         this.shared.eventService
       );
+      this.shared.liveActivityService = new LiveActivityService(
+        this.shared.deviceService,
+        liveActivityApiService
+      );
 
       this.shared.storageService.set(this.configKey, config);
+      this.shared.liveActivityService.initialize();
       await this.shared.notificationService.initialize(); // NOTE(nyanxyz): must be initialized before any await calls
       await this.shared.deviceService.initialize();
 
