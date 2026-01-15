@@ -53,7 +53,7 @@ class ClixLiveActivityModule: RCTEventEmitter {
   /// Starts listening for push-to-start tokens. Call this from AppDelegate.
   /// - Parameter activityType: The ActivityAttributes type to listen for
   @available(iOS 16.1, *)
-  public static func setup<Attributes: ActivityAttributes>(_ activityType: Attributes.Type) {
+  static func setup<Attributes: ActivityAttributes>(_ activityType: Attributes.Type) {
     guard #available(iOS 17.2, *) else {
       print("[Clix] LiveActivity pushToStartToken requires iOS 17.2+")
       return
