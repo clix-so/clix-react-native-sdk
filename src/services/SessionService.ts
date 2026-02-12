@@ -48,7 +48,10 @@ export class SessionService {
   private async handleAppStateChange(
     nextAppState: AppStateStatus
   ): Promise<void> {
-    if (this.lastAppState === 'background' && nextAppState === 'active') {
+    const previousAppState = this.lastAppState;
+    this.lastAppState = nextAppState;
+
+    if (previousAppState === 'background' && nextAppState === 'active') {
       // Small delay to allow notification tap handlers to set pendingMessageId
       await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -60,7 +63,6 @@ export class SessionService {
         if (elapsed <= this.effectiveTimeoutMs) {
           this.pendingMessageId = undefined;
           this.updateLastActivity();
-          this.lastAppState = nextAppState;
           return;
         }
       }
@@ -68,7 +70,6 @@ export class SessionService {
     } else if (nextAppState === 'background') {
       this.updateLastActivity();
     }
-    this.lastAppState = nextAppState;
   }
 
   setPendingMessageId(messageId?: string): void {
