@@ -19,6 +19,7 @@ import type { ClixPushNotificationPayload } from '../models/ClixPushNotification
 import { ClixLogger } from '../utils/logging/ClixLogger';
 import { DeviceService } from './DeviceService';
 import { EventService } from './EventService';
+import { SessionService } from './SessionService';
 import { TokenService } from './TokenService';
 
 type NotificationData = Record<string, any>;
@@ -66,7 +67,8 @@ export class NotificationService {
   constructor(
     private readonly deviceService: DeviceService,
     private readonly tokenService: TokenService,
-    private readonly eventService: EventService
+    private readonly eventService: EventService,
+    private readonly sessionService?: SessionService
   ) {}
 
   async initialize(): Promise<void> {
@@ -438,6 +440,7 @@ export class NotificationService {
     payload: ClixPushNotificationPayload
   ): Promise<void> {
     try {
+      this.sessionService?.setPendingMessageId(payload.messageId);
       await this.eventService.trackEvent(
         'PUSH_NOTIFICATION_TAPPED',
         {},
