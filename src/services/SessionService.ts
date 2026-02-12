@@ -36,6 +36,7 @@ export class SessionService {
     if (lastActivity) {
       const elapsed = Date.now() - lastActivity;
       if (elapsed <= this.effectiveTimeoutMs) {
+        this.pendingMessageId = undefined;
         this.updateLastActivity();
         ClixLogger.debug('Continuing existing session');
         return;
@@ -57,6 +58,7 @@ export class SessionService {
       if (lastActivity) {
         const elapsed = Date.now() - lastActivity;
         if (elapsed <= this.effectiveTimeoutMs) {
+          this.pendingMessageId = undefined;
           this.updateLastActivity();
           this.lastAppState = nextAppState;
           return;
