@@ -85,7 +85,10 @@ export class SessionService {
       await this.eventService.trackEvent(
         SessionEvent.SESSION_START,
         {},
-        messageId
+        messageId,
+        undefined,
+        undefined,
+        'CLIX'
       );
       ClixLogger.debug(`${SessionEvent.SESSION_START} tracked`);
     } catch (error) {

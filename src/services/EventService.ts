@@ -30,7 +30,8 @@ export class EventService {
     properties?: Record<string, any>,
     messageId?: string,
     userJourneyId?: string,
-    userJourneyNodeId?: string
+    userJourneyNodeId?: string,
+    sourceType?: string
   ): Promise<void> {
     const deviceId = this.deviceService.getCurrentDeviceId();
 
@@ -40,7 +41,8 @@ export class EventService {
       this.serializeProperties(properties),
       messageId,
       userJourneyId,
-      userJourneyNodeId
+      userJourneyNodeId,
+      sourceType
     );
   }
 }
