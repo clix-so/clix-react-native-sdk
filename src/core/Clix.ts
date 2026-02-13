@@ -6,6 +6,7 @@ import { EventService } from '../services/EventService';
 import { LiveActivityAPIService } from '../services/LiveActivityAPIService';
 import { LiveActivityService } from '../services/LiveActivityService';
 import { NotificationService } from '../services/NotificationService';
+import { SessionService } from '../services/SessionService';
 import { StorageService } from '../services/StorageService';
 import { TokenService } from '../services/TokenService';
 import { ClixLogger, ClixLogLevel } from '../utils/logging/ClixLogger';
@@ -29,6 +30,7 @@ export class Clix {
   tokenService?: TokenService;
   eventService?: EventService;
   deviceService?: DeviceService;
+  sessionService?: SessionService;
   notificationService?: NotificationService;
   liveActivityService?: LiveActivityService;
 
@@ -68,10 +70,16 @@ export class Clix {
         eventApiService,
         this.shared.deviceService
       );
+      this.shared.sessionService = new SessionService(
+        this.shared.storageService,
+        this.shared.eventService,
+        config.sessionTimeoutMs ?? 30000
+      );
       this.shared.notificationService = new NotificationService(
         this.shared.deviceService,
         this.shared.tokenService,
-        this.shared.eventService
+        this.shared.eventService,
+        this.shared.sessionService
       );
       this.shared.liveActivityService = new LiveActivityService(
         this.shared.deviceService,
@@ -81,6 +89,7 @@ export class Clix {
       this.shared.storageService.set(this.configKey, config);
       this.shared.liveActivityService.initialize();
       await this.shared.notificationService.initialize(); // NOTE(nyanxyz): must be initialized before any await calls
+      await this.shared.sessionService.start();
       await this.shared.deviceService.initialize();
 
       ClixLogger.debug('Clix SDK initialized successfully');
