@@ -422,7 +422,8 @@ export class NotificationService {
         {},
         payload.messageId,
         payload.userJourneyId,
-        payload.userJourneyNodeId
+        payload.userJourneyNodeId,
+        'CLIX'
       );
       ClixLogger.debug(
         'PUSH_NOTIFICATION_RECEIVED event tracked:',
@@ -446,7 +447,8 @@ export class NotificationService {
         {},
         payload.messageId,
         payload.userJourneyId,
-        payload.userJourneyNodeId
+        payload.userJourneyNodeId,
+        'CLIX'
       );
       ClixLogger.debug(
         'PUSH_NOTIFICATION_TAPPED event tracked:',
