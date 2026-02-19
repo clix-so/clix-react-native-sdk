@@ -135,6 +135,8 @@ export class Clix {
   static async reset(): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
+      this.shared?.sessionService?.cleanup();
+      this.shared?.liveActivityService?.cleanup();
       this.shared?.notificationService?.cleanup();
       this.shared?.storageService?.remove('clix_device_id');
       this.shared?.storageService?.remove('clix_session_last_activity');
