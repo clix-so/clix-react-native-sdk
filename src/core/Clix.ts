@@ -115,6 +115,7 @@ export class Clix {
 
   /**
    * Remove user ID
+   * @deprecated Use reset() instead
    */
   static async removeUserId(): Promise<void> {
     try {
@@ -122,6 +123,25 @@ export class Clix {
       await this.shared?.deviceService?.removeProjectUserId();
     } catch (error) {
       ClixLogger.error(`Failed to remove user ID: ${error}`);
+    }
+  }
+
+  /**
+   * Resets all local SDK state including device ID.
+   *
+   * After calling this method, you must call initialize() again before using the SDK.
+   * Use this when a user logs out and you want to start fresh with a new device identity.
+   */
+  static async reset(): Promise<void> {
+    try {
+      await Clix.initCoordinator.waitForInitialization();
+      this.shared?.notificationService?.cleanup();
+      this.shared?.storageService?.remove('clix_device_id');
+      this.shared?.storageService?.remove('clix_session_last_activity');
+      this.shared = undefined;
+      this.initCoordinator.reset();
+    } catch (error) {
+      ClixLogger.error(`Failed to reset: ${error}`);
     }
   }
 
