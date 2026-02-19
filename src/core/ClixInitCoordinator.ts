@@ -43,6 +43,15 @@ export class ClixInitCoordinator {
     this.reject?.(error);
   }
 
+  reset(): void {
+    this.isCompleted = false;
+    this.isFailed = false;
+    this.promise = new Promise<void>((resolve, reject) => {
+      this.resolve = resolve;
+      this.reject = reject;
+    });
+  }
+
   private isAlreadyFinalized(): boolean {
     if (this.isCompleted || this.isFailed) {
       ClixLogger.warn('Initialization already completed or failed');
