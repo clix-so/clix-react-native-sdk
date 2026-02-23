@@ -136,9 +136,34 @@ await Clix.setUserProperties({
 // Remove user properties
 await Clix.removeUserProperty('name');
 await Clix.removeUserProperties(['age', 'premium']);
+```
 
-// Remove user ID
-await Clix.removeUserId();
+### Reset
+
+Use `reset()` when you need a completely fresh device identity (e.g., shared device scenarios). This generates a new device ID, removes the user ID, and clears session data.
+
+```typescript
+await Clix.reset();
+```
+
+> **Note:** After calling `reset()`, you must call `initialize()` again before using the SDK.
+
+### Event Tracking
+
+```typescript
+// Track an event with properties
+await Clix.trackEvent('signup_completed', {
+  method: 'email',
+  discount_applied: true,
+  trial_days: 14,
+});
+```
+
+### Device Information
+
+```typescript
+// Get device ID
+const deviceId = await Clix.getDeviceId();
 ```
 
 ### Logging
@@ -187,14 +212,49 @@ NotificationService.setupBackgroundMessageHandler();
 AppRegistry.registerComponent(appName, () => App);
 ```
 
-#### Handling Notifications
+#### Configure Notification Handling
 
-The SDK automatically handles notification registration and token management. Notifications are processed internally for analytics and tracking.
+Configure notification handling after initializing the SDK:
 
 ```typescript
-// Notification handling is automatic - no additional code required
-// The SDK will track notification delivery and engagement automatically
+import Clix from '@clix-so/react-native-sdk';
+
+await Clix.initialize({
+  projectId: 'YOUR_PROJECT_ID',
+  apiKey: 'YOUR_API_KEY',
+});
+
+// Configure notification handling
+Clix.Notification.configure({
+  autoRequestPermission: true,   // Request permission immediately
+  autoHandleLandingUrl: true,    // Auto-open landing URLs on tap
+});
 ```
+
+#### Notification Handlers
+
+Register handlers for push notification events:
+
+```typescript
+// Foreground message handler
+Clix.Notification.onMessage(async (data) => {
+  console.log('Foreground message:', data);
+  return true; // Return true to display, false to suppress
+});
+
+// Notification tap handler
+Clix.Notification.onNotificationOpened(async (data) => {
+  console.log('Notification tapped:', data);
+  // Handle custom routing based on notification data
+});
+
+// FCM token error handler
+Clix.Notification.onFcmTokenError((error) => {
+  console.error('FCM token error:', error);
+});
+```
+
+**Important:** All `Clix.Notification` methods must be called **after** `Clix.initialize()`.
 
 ## Firebase Setup
 
