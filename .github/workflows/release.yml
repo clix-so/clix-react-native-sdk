@@ -54,6 +54,9 @@ jobs:
             echo "dist_tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Upgrade npm
+        run: npm install -g npm@11.5.1
+
       - name: Install dependencies
         run: npm ci
 
@@ -82,8 +85,6 @@ jobs:
 
       - name: Release to npm
         run: npm publish --provenance --access public --tag ${{ steps.version_metadata.outputs.dist_tag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
   generate-llms:
     needs: release
