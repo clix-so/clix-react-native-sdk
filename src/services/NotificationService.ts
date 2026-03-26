@@ -437,6 +437,29 @@ export class NotificationService {
     }
   }
 
+  async trackPushTapped(data: Record<string, any>): Promise<void> {
+    const clixPayload = this.parseClixPayload(data);
+    if (!clixPayload) {
+      throw new Error(
+        'No valid Clix payload found in notification data. ' +
+          "Ensure the notification data contains a 'clix' key with message_id, title, and body."
+      );
+    }
+    this.sessionService?.setPendingMessageId(clixPayload.messageId);
+    await this.eventService.trackEvent(
+      'PUSH_NOTIFICATION_TAPPED',
+      {},
+      clixPayload.messageId,
+      clixPayload.userJourneyId,
+      clixPayload.userJourneyNodeId,
+      'CLIX'
+    );
+    ClixLogger.debug(
+      'PUSH_NOTIFICATION_TAPPED event tracked:',
+      clixPayload.messageId
+    );
+  }
+
   private async trackPushTappedEvent(
     payload: ClixPushNotificationPayload
   ): Promise<void> {
