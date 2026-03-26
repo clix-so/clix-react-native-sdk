@@ -80,6 +80,15 @@ export class ClixNotification {
     }
   }
 
+  async trackPushNotificationTapped(data: Record<string, any>): Promise<void> {
+    await Clix.initCoordinator.waitForInitialization();
+    const notificationService = Clix.shared?.notificationService;
+    if (!notificationService) {
+      throw new Error('Notification service is not initialized');
+    }
+    await notificationService.trackPushTapped(data);
+  }
+
   async onMessage(handler?: MessageHandler): Promise<void> {
     try {
       await Clix.initCoordinator.waitForInitialization();
